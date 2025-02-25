@@ -1,12 +1,35 @@
-const http = require("http");
+const http = require('http')
+
+const dancers = []
 
 const handleRequest = (req, res) => {
-    res.writeHead(200, { "Content-Type": "text/plain" });
-    res.write("Hello from local Node.js!");
-    res.end();
-};
-
-const server = http.createServer(handleRequest);
-server.listen(3000, () => {
-    console.log("Server running at http://localhost:3000/");
-});
+	const [path, query] = req.url.split('?')
+	if(req.method == "POST") {
+		let body = ''
+		req.on('data', (data) => {
+			body += data
+		})
+		req.on('end', () => {
+			try {
+				const params = JSON.parse(body)
+				dancers.push(params)
+				kbye(res)
+			} catch {
+				res.writeHead(400)
+				res.end('Bad. Go away.')
+			}
+		})
+	} else {
+		res.write(JSON.stringify(dancers))
+		res.end()
+	}
+}
+const kbye = (res) => {
+	res.writeHead(200, {
+		"Content-Type": "application/json"
+	})
+	res.write(JSON.stringify(dancers))
+	res.end()
+}
+const server = http.createServer(handleRequest)
+server.listen(3000)

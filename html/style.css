@@ -1,0 +1,12 @@
+body {
+    font-family: "Comic Sans MS", cursive, sans-serif;
+    background-color: #f4f4f4;
+    text-align: center;
+}
+h1 {
+    color: teal;
+}
+a {
+    font-size: 18px;
+    color: red;
+}
