@@ -1,15 +1,132 @@
+/* Global Styles */
 body {
-    font-family: "Comic Sans MS", cursive, sans-serif;
-    background-color: #f4f4f4;
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: rgb(240, 210, 100);
+    color: rgb(96, 198, 166); 
+}
+
+/* Header Styling */
+header {
+    background-color: rgb(233, 150, 122);
+    color: white;
+    padding: 35px;
+    text-align: center;
+    border-bottom: 4px solid rgb(96, 198, 166);
+}
+header h1 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: white;
+    text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+nav {
+    margin-top: 10px;
+}
+
+nav a {
+    color: white;
+    text-decoration: none;
+    margin: 0 15px;
+    font-size: 1.1rem;
+    font-weight: bold;
+    transition: color 0.3s;
+}
+
+nav a:hover {
+    color: rgb(96, 198, 166);
+    text-decoration: underline;
+}
+
+/* Main Sections */
+main {
+    padding: 20px;
     text-align: center;
 }
-h1 {
-    color: teal;
+
+.hero {
+    background: linear-gradient(135deg, rgb(65, 170, 210), rgb(96, 198, 166)); /* Sky Blue to Teal gradient */
+    color: white;
+    padding: 40px;
+    border-radius: 10px;
+    margin: 20px auto;
+    max-width: 90%;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
-a {
-    font-size: 18px;
-    color: red;
-}
+
 ul {
     list-style-type: none;
+    padding: 0;
+}
+
+/* Button Styling */
+.btn {
+    display: inline-block;
+    background: rgb(96, 198, 166);
+    color: white;
+    padding: 12px 24px;
+    text-decoration: none;
+    border-radius: 8px;
+    font-weight: bold;
+    margin-top: 10px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.btn:hover {
+    background: rgb(65, 170, 210);
+    transform: scale(1.05);
+}
+
+/* Form Styles */
+form {
+    display: flex;
+    flex-direction: column;
+    max-width: 400px;
+    margin: 20px auto;
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+input {
+    padding: 12px;
+    margin-bottom: 12px;
+    border: 2px solid rgb(233, 150, 122);
+    border-radius: 6px;
+    font-size: 1rem;
+}
+
+button {
+    background: rgb(96, 198, 166);
+    color: white;
+    padding: 12px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+button:hover {
+    background: rgb(65, 170, 210); /* Sky Blue on hover */
+    transform: scale(1.05);
+}
+
+/* Opportunity List */
+.opportunity-list ul {
+    list-style: none;
+    padding: 0;
+}
+
+.opportunity-list li {
+    background: white;
+    padding: 15px;
+    margin: 10px 0;
+    border-radius: 8px;
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15);
+    border-left: 6px solid rgb(233, 150, 122); /* Coral accent */
 }

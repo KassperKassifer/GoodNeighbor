@@ -1,9 +1,25 @@
 document.addEventListener("DOMContentLoaded", () => {
-    refreshOpportunities();
-    document.getElementById("opportunityForm").addEventListener("submit", addOpportunity);
+    console.log("Page Loaded");
+
+    // Check if the volunteer list exists before refreshing opportunities
+    if (document.getElementById("opportunityList")) {
+        refreshOpportunities();
+    }
+
+    // Check if the form exists before adding an event listener
+    const form = document.getElementById("opportunityForm");
+    if (form) {
+        form.addEventListener("submit", addOpportunity);
+    }
+
+    // Check if the search field exists before adding event listeners
+    const searchButton = document.getElementById("fetchOppByNameButton");
+    if (searchButton) {
+        searchButton.addEventListener("click", fetchOppByName);
+    }
 });
 
-// 
+// Refresh Volunteer Opportunities
 const refreshOpportunities = () => {
     console.log("Refreshing volunteer opportunities...");
 
@@ -11,25 +27,36 @@ const refreshOpportunities = () => {
         .then(body => body.json())
         .then(opportunities => {
             const list = document.getElementById("opportunityList");
+            if (!list) return; // Ensure the element exists
+
             list.innerHTML = "";
 
             opportunities.forEach((opportunity) => {
                 const listItem = document.createElement('li');
                 listItem.textContent = `${opportunity.name} - ${opportunity.location}`;
                 list.appendChild(listItem);
-            })
+            });
 
-            console.log("Fetched Volunteer Opportunities:", opportunities)
+            console.log("Fetched Volunteer Opportunities:", opportunities);
         })
-}
+        .catch(error => console.error("Error fetching volunteer opportunities:", error));
+};
 
 // POST new volunteer
 async function addOpportunity(event) {
     event.preventDefault();
     console.log("addOpportunity() function is running!");
 
-    let name = document.getElementById("name").value;
-    let location = document.getElementById("location").value;
+    const nameField = document.getElementById("name");
+    const locationField = document.getElementById("location");
+
+    if (!nameField || !locationField) {
+        console.error("Form fields not found.");
+        return;
+    }
+
+    let name = nameField.value;
+    let location = locationField.value;
 
     try {
         let response = await fetch('/api', {
@@ -70,7 +97,13 @@ async function fetchAllOpportunities() {
 
 // GET an opportunity by name
 async function fetchOppByName() {
-    let name = document.getElementById("oppNameSearch").value;
+    const searchField = document.getElementById("oppNameSearch");
+    if (!searchField) {
+        console.error("Search field not found.");
+        return;
+    }
+
+    let name = searchField.value;
     if (!name) {
         alert("Please enter a name to search.");
         return;

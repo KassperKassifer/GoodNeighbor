@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Profile</title>
+    <link rel="stylesheet" type="text/css" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>GoodNeighbor</h1>
+        <nav>
+            <a href="index.html">Home</a>
+            <a href="events.html">Events</a>
+            <a href="profile.html">Profile</a>
+        </nav>
+    </header>
+    
+    <main>
+        <section class="profile">
+            <h2>Your Profile</h2>
+            <p>Track your volunteer hours and signups.</p>
+        </section>
+        
+        <section class="api-links">
+            <h2>API Example Links</h2>
+            <ul>
+                <li><a href="#" onclick="fetchAllOpportunities()">Get All Volunteer Opportunities</a></li>
+                <li><a href="#" onclick="fetchOppByName()">Get Opportunity by Name</a></li>
+            </ul>
+            <input type="text" id="oppNameSearch" placeholder="Enter name to search" />
+        </section>
+    </main>
+    
+    <script src="script.js"></script>
+</body>
+</html>
