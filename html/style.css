@@ -10,3 +10,6 @@ a {
     font-size: 18px;
     color: red;
 }
+ul {
+    list-style-type: none;
+}
