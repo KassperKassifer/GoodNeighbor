@@ -33,7 +33,11 @@ const refreshOpportunities = () => {
 
             opportunities.forEach((opportunity) => {
                 const listItem = document.createElement('li');
-                listItem.textContent = `${opportunity.name} - ${opportunity.location}`;
+                listItem.innerHTML = `
+                    <strong>${opportunity.name}</strong> ${opportunity.location}
+                    <button onclick="editOpportunity('${opportunity.id}')">Edit</button>
+                    <button onclick="deleteOpportunity('${opportunity.id}')">Delete</button>
+                `;
                 list.appendChild(listItem);
             });
 
@@ -58,15 +62,24 @@ async function addOpportunity(event) {
     let name = nameField.value;
     let location = locationField.value;
 
+    if (!name || !location) {
+        console.error("Form fields cannot be empty.");
+        return;
+    }
+
+    const requestBody = JSON.stringify({ name, location });
+    console.log("Sending data:", requestBody);
+
     try {
         let response = await fetch('/api', {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name, location })
+            body: requestBody
         });
 
         if (!response.ok) {
-            throw new Error(`HTTP error! Status: ${response.status}`);
+            let errorMessage = await response.text();
+            throw new Error(`Failed to add opportunity: ${errorMessage}`);
         }
 
         let result = await response.json();
@@ -120,5 +133,44 @@ async function fetchOppByName() {
     } catch (error) {
         console.error("Error fetching opportunity by name:", error);
         alert("Error fetching opportunity. Check console for details.");
+    }
+}
+
+// PUT: Edit an existing opportunity
+async function editOpportunity(id) {
+    const newName = prompt("Enter new opportunity name:");
+    const newLocation = prompt("Enter new location:");
+
+    if (!newName || !newLocation) return;
+
+    try {
+        let response = await fetch(`/api/${id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: newName, location: newLocation })
+        });
+
+        if (!response.ok) throw new Error("Failed to edit opportunity");
+
+        refreshOpportunities(); // Update the list after editing
+    } catch (error) {
+        console.error("Error editing opportunity:", error);
+    }
+}
+
+// DELETE: Remove an opportunity
+async function deleteOpportunity(id) {
+    if (!confirm("Are you sure you want to delete this opportunity?")) return;
+
+    try {
+        let response = await fetch(`/api/${id}`, {
+            method: "DELETE"
+        });
+
+        if (!response.ok) throw new Error("Failed to delete opportunity");
+
+        refreshOpportunities(); // Update the list after deletion
+    } catch (error) {
+        console.error("Error deleting opportunity:", error);
     }
 }
