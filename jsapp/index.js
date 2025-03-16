@@ -1,35 +1,24 @@
 #!/usr/bin/env node
 const http = require('http');
 const fs = require('node:fs');
+require("dotenv").config();
+const { Pool } = require("pg");
 
-const DB_FILE = "db.json";
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+});
 
-// Load opportunities from JSON file on startup
-let volunteerOpportunities = [];
-fs.readFile(DB_FILE, "utf8", (err, data) => {
-    if (err || !data) {
-        console.error("Error reading database file, initializing new array.");
-        volunteerOpportunities = []; // Default to an empty array if file is missing or empty
-        return;
-    }
-    try {
-        const parsedData = JSON.parse(data);
-        volunteerOpportunities = Array.isArray(parsedData) ? parsedData : []; // Ensure it's an array
-    } catch (error) {
-        console.error("Error parsing database file, resetting to empty array:", error);
-        volunteerOpportunities = []; // Reset if corrupted
+// Test database connection on startup
+pool.query("SELECT NOW()", (err, res) => {
+    if (err) {
+        console.error("Database connection error:", err);
+    } else {
+        console.log("Connected to PostgreSQL at:", res.rows[0].now);
     }
 });
 
-// Helper function to save opportunities to JSON database
-const saveOpportunities = () => {
-    fs.writeFile(DB_FILE, JSON.stringify(volunteerOpportunities, null, 2), (err) => {
-        if (err) console.error("Error saving database file:", err);
-    });
-};
-
-const parseData = (query = '') =>
-    Object.fromEntries(new URLSearchParams(query));
+// Helper function to parse query parameters
+const parseData = (query = '') => Object.fromEntries(new URLSearchParams(query));
 
 const handleRequest = (req, res) => {
     const [path, query] = req.url.split('?');
@@ -42,7 +31,7 @@ const handleRequest = (req, res) => {
             console.log("Received raw data chunk:", data.toString()); // Log each chunk
             body += data;
         });
-        req.on("end", () => {
+        req.on("end", async() => {
             console.log("Full received request body:", body);
 
             try {
@@ -54,61 +43,86 @@ const handleRequest = (req, res) => {
                     return sendJSON(res, { error: "Missing 'name' or 'location'" }, 400);
                 }
 
-                newEntry.id = String(Date.now());
-                volunteerOpportunities.push(newEntry);
-                saveOpportunities();
-                sendJSON(res, newEntry, 201);
+                // Insert into PostgreSQL
+                const result = await pool.query(
+                    "INSERT INTO opportunities (name, location) VALUES ($1, $2) RETURNING *",
+                    [newEntry.name, newEntry.location]
+                );
+                sendJSON(res, result.rows[0], 201);
             } catch (error) {
                 console.error("JSON Parsing Error:", error.message); // Log error details
-                sendJSON(res, { error: "Invalid JSON", details: error.message }, 400);
+                sendJSON(res, { error: "Invalid JSON or database error", details: error.message }, 400);
             }
         });
     } else if (req.method === "GET") {
-        if (params.name) {
-            let filteredVolunteers = volunteerOpportunities.filter(v =>
-                v.name.toLowerCase() === params.name.toLowerCase());
+        (async () => {
+            try {
+                let result;
+                if (params.name) {
+                    result = await pool.query("SELECT * FROM opportunities WHERE LOWER(name) = LOWER($1)", [params.name]);
+                } else {
+                    result = await pool.query("SELECT * FROM opportunities");
+                }
 
-            if (filteredVolunteers.length === 0) {
-                return sendJSON(res, { error: "No opportunities found" }, 404);
+                if (result.rows.length === 0) {
+                    return sendJSON(res, { error: "No opportunities found" }, 404);
+                }
+                sendJSON(res, result.rows);
+            } catch (error) {
+                console.error("Error fetching opportunities:", error);
+                sendJSON(res, { error: "Database error" }, 500);
             }
-
-            sendJSON(res, filteredVolunteers); // Return only matched results
-        } else {
-            sendJSON(res, Array.isArray(volunteerOpportunities) ? volunteerOpportunities : []); // Return all volunteers
-        }
+        })();
     } else if (req.method === "PUT") {
         const id = path.split("/")[2];
         let body = "";
         req.on("data", data => body += data);
-        req.on("end", () => {
+        req.on("end", async() => {
             try {
                 const updatedEntry = JSON.parse(body);
-                const opportunity = volunteerOpportunities.find(v => v.id === id);
+                console.log("Received update request:", updatedEntry);
 
-                if (!opportunity) {
+                // Fetch opportunity from database
+                const result = await pool.query(
+                    "SELECT * FROM opportunities WHERE id = $1",
+                    [id]
+                );
+
+                if (result.rows.length === 0) {
                     console.error(`Opportunity with ID ${id} not found`);
                     return sendJSON(res, { error: `Opportunity with ID ${id} not found` }, 404);
                 }
 
-                opportunity.name = updatedEntry.name;
-                opportunity.location = updatedEntry.location;
-                saveOpportunities();
-                sendJSON(res, opportunity, 200);
-            } catch {
-                sendJSON(res, { error: "Invalid JSON" }, 400);
+                // Update the opportunity in the database
+                const updatedOpportunity = await pool.query(
+                    "UPDATE opportunities SET name = $1, location = $2 WHERE id = $3 RETURNING *",
+                    [updatedEntry.name, updatedEntry.location, id]
+                );
+
+                console.log("Updated opportunity:", updatedOpportunity.rows[0]);
+                sendJSON(res, updatedOpportunity.rows[0], 200);
+            } catch (error) {
+                console.error("Error updating opportunity:", error.message);
+                if (!res.headersSent) { // Prevents "ERR_HTTP_HEADERS_SENT"
+                    sendJSON(res, { error: "Invalid JSON or Update Failed", details: error.message }, 400);
+                }
             }
         });
     } else if (req.method === "DELETE") {
         const id = path.split("/")[2];
-        const initialLength = volunteerOpportunities.length;
-        volunteerOpportunities = volunteerOpportunities.filter(v => v.id !== id);
-
-        if (volunteerOpportunities.length === initialLength) {
-            return sendJSON(res, { error: "Opportunity not found" }, 404);
-        }
-
-        saveOpportunities();
-        sendJSON(res, { success: true }, 200);
+        (async () => {
+            try {
+                const result = await pool.query("DELETE FROM opportunities WHERE id = $1 RETURNING *", [id]);
+                if (result.rows.length === 0) {
+                    console.error(`Opportunity with ID ${id} not found`);
+                    return sendJSON(res, { error: `Opportunity with ID ${id} not found` }, 404);
+                }
+                sendJSON(res, { success: true }, 200);
+            } catch (error) {
+                console.error("Error deleting opportunity:", error);
+                sendJSON(res, { error: "Database error" }, 500);
+            }
+        })();
     } else {
         sendJSON(res, { error: "Operation Not Found" }, 404);
     }
