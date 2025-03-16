@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 const http = require('http');
-const fs = require('node:fs');
+const bcrypt = require("bcrypt");
 require("dotenv").config();
 const { Pool } = require("pg");
 
@@ -17,13 +17,102 @@ pool.query("SELECT NOW()", (err, res) => {
     }
 });
 
+// Hash password function (for storing new users)
+const hashPassword = async (password) => {
+    const saltRounds = 10;
+    return bcrypt.hash(password, saltRounds);
+};
+
+// Verify password function (for login)
+const verifyPassword = async (password, hash) => {
+    return bcrypt.compare(password, hash);
+};
+
+// Authenticate user function
+const authenticate = async (auth = '') => {
+    if (!auth.startsWith('Basic ')) return false;
+
+    try {
+        const decoded = Buffer.from(auth.slice(6), 'base64').toString();
+        const [username, password] = decoded.split(':');
+
+        if (!username || !password) {
+            console.log('Invalid auth format');
+            return false;
+        }
+
+        const result = await pool.query('SELECT password FROM users WHERE username = $1', [username]);
+        if (result.rows.length === 0) {
+            console.log('User not found:', username);
+            return false;
+        }
+
+        return await verifyPassword(password, result.rows[0].password);
+    } catch (err) {
+        console.error('Error checking user authentication:', err);
+        return false;
+    }
+};
+
+// Register New User
+const handleRegister = async (req, res) => {
+    if (req.method !== "POST") {
+        return sendJSON(res, { error: "Method not allowed" }, 405);
+    }
+
+    let body = "";
+    req.on("data", (data) => (body += data));
+    req.on("end", async () => {
+        try {
+            const { username, password } = JSON.parse(body);
+
+            if (!username || !password) {
+                return sendJSON(res, { error: "Username and password are required" }, 400);
+            }
+
+            // Check if user already exists
+            const userExists = await pool.query("SELECT * FROM users WHERE username = $1", [username]);
+            if (userExists.rows.length > 0) {
+                return sendJSON(res, { error: "Username already exists" }, 400);
+            }
+
+            // Hash the password before storing
+            const hashedPassword = await hashPassword(password);
+            
+            // Insert new user into the database
+            const result = await pool.query(
+                "INSERT INTO users (username, password) VALUES ($1, $2) RETURNING id, username",
+                [username, hashedPassword]
+            );
+
+            sendJSON(res, { success: true, user: result.rows[0] }, 201);
+        } catch (error) {
+            console.error("Error registering user:", error);
+            sendJSON(res, { error: "Internal Server Error" }, 500);
+        }
+    });
+};
+
 // Helper function to parse query parameters
 const parseData = (query = '') => Object.fromEntries(new URLSearchParams(query));
 
-const handleRequest = (req, res) => {
+const handleRequest = async (req, res) => {
     const [path, query] = req.url.split('?');
     const params = parseData(query);
     console.log(`Received ${req.method} request to: ${req.url}`);
+
+    if (path === "/register") {
+        return handleRegister(req, res);
+    }
+
+    // Protect routes that require authentication
+    if (['POST', 'PUT', 'DELETE'].includes(req.method)) {
+        const isAuthenticated = await authenticate(req.headers.authorization);
+        if (!isAuthenticated) {
+            res.writeHead(401, { "WWW-Authenticate": "Basic realm='GoodNeighbor'" });
+            return res.end('Unauthorized');
+        }
+    }
 
     if (req.method === "POST") {
         let body = "";
