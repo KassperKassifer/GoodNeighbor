@@ -50,7 +50,7 @@ async function registerUser(event) {
     }
 
     try {
-        let response = await fetch("/register", {
+        let response = await fetch("/api/register", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ username, password })

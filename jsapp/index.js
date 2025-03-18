@@ -110,12 +110,12 @@ const handleRequest = async (req, res) => {
     const params = parseData(query);
     console.log(`Received ${req.method} request to: ${req.url}`);
 
-    let auth = await authenticate(req.headers.authorization);
-
     // Standard registration
-    if (path === "/register") {
+    if (path === "/api/register") {
         return handleRegister(req, res);
     }
+
+    let auth = await authenticate(req.headers.authorization);
 
     // Admin registering other users
     if (path === "/register-admin") {
