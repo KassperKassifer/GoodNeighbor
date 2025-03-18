@@ -73,7 +73,10 @@ async function addOpportunity(event) {
     try {
         let response = await fetch('/api', {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { 
+                "Content-Type": "application/json",
+                "Authorization": sessionStorage.getItem("authHeader")
+            },
             body: requestBody
         });
 
@@ -81,9 +84,6 @@ async function addOpportunity(event) {
             let errorMessage = await response.text();
             throw new Error(`Failed to add opportunity: ${errorMessage}`);
         }
-
-        let result = await response.json();
-        console.log("Added opportunity:", result);
 
         refreshOpportunities(); // Refresh the volunteer list
         document.getElementById("opportunityForm").reset();
@@ -100,7 +100,7 @@ async function fetchAllOpportunities() {
         if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
 
         let data = await response.json();
-        console.log("All Volunteers:", data);
+        console.log("All Volunteer Opportunities:", data);
         alert(JSON.stringify(data, null, 2)); // Show data in an alert box
     } catch (error) {
         console.error("Error fetching all volunteers:", error);
@@ -146,7 +146,10 @@ async function editOpportunity(id) {
     try {
         let response = await fetch(`/api/${id}`, {
             method: "PUT",
-            headers: { "Content-Type": "application/json" },
+            headers: { 
+                "Content-Type": "application/json",
+                "Authorization": sessionStorage.getItem("authHeader")
+            },
             body: JSON.stringify({ name: newName, location: newLocation })
         });
 
@@ -164,7 +167,10 @@ async function deleteOpportunity(id) {
 
     try {
         let response = await fetch(`/api/${id}`, {
-            method: "DELETE"
+            method: "DELETE",
+            headers: {
+                "Authorization": sessionStorage.getItem("authHeader")
+            }
         });
 
         if (!response.ok) throw new Error("Failed to delete opportunity");

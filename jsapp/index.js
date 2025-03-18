@@ -20,42 +20,45 @@ pool.query("SELECT NOW()", (err, res) => {
 // Hash password function (for storing new users)
 const hashPassword = async (password) => {
     const saltRounds = 10;
-    return bcrypt.hash(password, saltRounds);
+    const pepper = process.env.PEPPER_SECRET;
+
+    return bcrypt.hash(password + pepper, saltRounds);
 };
 
 // Verify password function (for login)
 const verifyPassword = async (password, hash) => {
-    return bcrypt.compare(password, hash);
+    const pepper = process.env.PEPPER_SECRET;
+    return bcrypt.compare(password + pepper, hash);
 };
 
 // Authenticate user function
 const authenticate = async (auth = '') => {
-    if (!auth.startsWith('Basic ')) return false;
+    if (!auth.startsWith('Basic ')) return { authenticated: false };
+
+    const [username, password] = Buffer.from(auth.slice(6), 'base64').toString().split(':');
+    if (!username || !password) return { authenticated: false };
 
     try {
-        const decoded = Buffer.from(auth.slice(6), 'base64').toString();
-        const [username, password] = decoded.split(':');
+        const result = await pool.query('SELECT password, role FROM users WHERE username = $1', [username]);
 
-        if (!username || !password) {
-            console.log('Invalid auth format');
-            return false;
-        }
-
-        const result = await pool.query('SELECT password FROM users WHERE username = $1', [username]);
         if (result.rows.length === 0) {
             console.log('User not found:', username);
-            return false;
+            return { authenticated: false };
         }
 
-        return await verifyPassword(password, result.rows[0].password);
+        const hash = result.rows[0].password;
+        const role = result.rows[0].role;
+
+        const isValid = await verifyPassword(password, hash);
+        return { authenticated: isValid, role: isValid ? role : null };
     } catch (err) {
         console.error('Error checking user authentication:', err);
-        return false;
+        return { authenticated: false };
     }
 };
 
 // Register New User
-const handleRegister = async (req, res) => {
+const handleRegister = async (req, res, adminRegistering = false) => {
     if (req.method !== "POST") {
         return sendJSON(res, { error: "Method not allowed" }, 405);
     }
@@ -64,7 +67,7 @@ const handleRegister = async (req, res) => {
     req.on("data", (data) => (body += data));
     req.on("end", async () => {
         try {
-            const { username, password } = JSON.parse(body);
+            const { username, password, role } = JSON.parse(body);
 
             if (!username || !password) {
                 return sendJSON(res, { error: "Username and password are required" }, 400);
@@ -78,11 +81,17 @@ const handleRegister = async (req, res) => {
 
             // Hash the password before storing
             const hashedPassword = await hashPassword(password);
+
+            // If an admin is registering a new user, they can set the role, otherwise default to "user"
+            let assignedRole = "user"; // Default role for self-registration
+            if (adminRegistering && ["admin", "organization"].includes(role)) {
+                assignedRole = role;
+            }
             
             // Insert new user into the database
             const result = await pool.query(
-                "INSERT INTO users (username, password) VALUES ($1, $2) RETURNING id, username",
-                [username, hashedPassword]
+                "INSERT INTO users (username, password, role) VALUES ($1, $2, $3) RETURNING id, username",
+                [username, hashedPassword, assignedRole]
             );
 
             sendJSON(res, { success: true, user: result.rows[0] }, 201);
@@ -101,121 +110,124 @@ const handleRequest = async (req, res) => {
     const params = parseData(query);
     console.log(`Received ${req.method} request to: ${req.url}`);
 
+    let auth = await authenticate(req.headers.authorization);
+
+    // Standard registration
     if (path === "/register") {
         return handleRegister(req, res);
     }
 
-    // Protect routes that require authentication
-    if (['POST', 'PUT', 'DELETE'].includes(req.method)) {
-        const isAuthenticated = await authenticate(req.headers.authorization);
-        if (!isAuthenticated) {
-            res.writeHead(401, { "WWW-Authenticate": "Basic realm='GoodNeighbor'" });
-            return res.end('Unauthorized');
+    // Admin registering other users
+    if (path === "/register-admin") {
+        if (!auth.authenticated || auth.role !== "admin") {
+            return sendJSON(res, { error: "Only admins can create new users" }, 403);
         }
+        return handleRegister(req, res, auth); // Pass authentication object
+    }
+
+    // Protect routes that require authentication
+    if (['POST', 'PUT', 'DELETE'].includes(req.method) && !auth.authenticated) {        
+        res.writeHead(401, { "WWW-Authenticate": "Basic realm='GoodNeighbor'" });
+        return res.end('Unauthorized');
     }
 
     if (req.method === "POST") {
-        let body = "";
-        req.on("data", (data) => {
-            console.log("Received raw data chunk:", data.toString()); // Log each chunk
-            body += data;
-        });
-        req.on("end", async() => {
-            console.log("Full received request body:", body);
+        if (auth.role !== "admin" && auth.role !== "organization") {
+            return sendJSON(res, { error: "Only organizations can create opportunities" }, 403);
+        }
 
+        let body = "";
+        req.on("data", (data) => (body += data));
+        req.on("end", async () => {
             try {
-                const newEntry = JSON.parse(body); // Parse JSON
+                const newEntry = JSON.parse(body);
                 console.log("Parsed JSON successfully:", newEntry);
 
                 if (!newEntry.name || !newEntry.location) {
-                    console.error("Missing 'name' or 'location' in request");
                     return sendJSON(res, { error: "Missing 'name' or 'location'" }, 400);
                 }
 
-                // Insert into PostgreSQL
+                // Insert into database
                 const result = await pool.query(
                     "INSERT INTO opportunities (name, location) VALUES ($1, $2) RETURNING *",
                     [newEntry.name, newEntry.location]
                 );
                 sendJSON(res, result.rows[0], 201);
             } catch (error) {
-                console.error("JSON Parsing Error:", error.message); // Log error details
+                console.error("Error adding opportunity:", error.message);
                 sendJSON(res, { error: "Invalid JSON or database error", details: error.message }, 400);
             }
         });
     } else if (req.method === "GET") {
-        (async () => {
-            try {
-                let result;
-                if (params.name) {
-                    result = await pool.query("SELECT * FROM opportunities WHERE LOWER(name) = LOWER($1)", [params.name]);
-                } else {
-                    result = await pool.query("SELECT * FROM opportunities");
-                }
-
-                if (result.rows.length === 0) {
-                    return sendJSON(res, { error: "No opportunities found" }, 404);
-                }
-                sendJSON(res, result.rows);
-            } catch (error) {
-                console.error("Error fetching opportunities:", error);
-                sendJSON(res, { error: "Database error" }, 500);
+        try {
+            let result;
+            if (params.name) {
+                result = await pool.query("SELECT * FROM opportunities WHERE LOWER(name) = LOWER($1)", [params.name]);
+            } else {
+                result = await pool.query("SELECT * FROM opportunities");
             }
-        })();
+
+            if (result.rows.length === 0) {
+                return sendJSON(res, { error: "No opportunities found" }, 404);
+            }
+            sendJSON(res, result.rows);
+        } catch (error) {
+            console.error("Error fetching opportunities:", error);
+            sendJSON(res, { error: "Database error" }, 500);
+        }
     } else if (req.method === "PUT") {
+        if (auth.role !== "admin" && auth.role !== "organization") {
+            return sendJSON(res, { error: "Only organizations can update opportunities" }, 403);
+        }
+
         const id = path.split("/")[2];
         let body = "";
-        req.on("data", data => body += data);
-        req.on("end", async() => {
+        req.on("data", (data) => (body += data));
+        req.on("end", async () => {
             try {
                 const updatedEntry = JSON.parse(body);
                 console.log("Received update request:", updatedEntry);
 
-                // Fetch opportunity from database
-                const result = await pool.query(
-                    "SELECT * FROM opportunities WHERE id = $1",
-                    [id]
-                );
-
-                if (result.rows.length === 0) {
-                    console.error(`Opportunity with ID ${id} not found`);
-                    return sendJSON(res, { error: `Opportunity with ID ${id} not found` }, 404);
-                }
-
                 // Update the opportunity in the database
-                const updatedOpportunity = await pool.query(
+                const result = await pool.query(
                     "UPDATE opportunities SET name = $1, location = $2 WHERE id = $3 RETURNING *",
                     [updatedEntry.name, updatedEntry.location, id]
                 );
 
-                console.log("Updated opportunity:", updatedOpportunity.rows[0]);
-                sendJSON(res, updatedOpportunity.rows[0], 200);
+                if (result.rows.length === 0) {
+                    return sendJSON(res, { error: "Opportunity not found" }, 404);
+                }
+
+                console.log("Updated opportunity:", result.rows[0]);
+                sendJSON(res, result.rows[0], 200);
             } catch (error) {
                 console.error("Error updating opportunity:", error.message);
-                if (!res.headersSent) { // Prevents "ERR_HTTP_HEADERS_SENT"
+                if (!res.headersSent) {
                     sendJSON(res, { error: "Invalid JSON or Update Failed", details: error.message }, 400);
                 }
             }
         });
     } else if (req.method === "DELETE") {
+        if (auth.role !== "admin" && auth.role !== "organization") {
+            return sendJSON(res, { error: "Only organizations can delete opportunities" }, 403);
+        }
+
         const id = path.split("/")[2];
-        (async () => {
-            try {
-                const result = await pool.query("DELETE FROM opportunities WHERE id = $1 RETURNING *", [id]);
-                if (result.rows.length === 0) {
-                    console.error(`Opportunity with ID ${id} not found`);
-                    return sendJSON(res, { error: `Opportunity with ID ${id} not found` }, 404);
-                }
-                sendJSON(res, { success: true }, 200);
-            } catch (error) {
-                console.error("Error deleting opportunity:", error);
-                sendJSON(res, { error: "Database error" }, 500);
+        try {
+            const result = await pool.query("DELETE FROM opportunities WHERE id = $1 RETURNING *", [id]);
+            if (result.rows.length === 0) {
+                return sendJSON(res, { error: `Opportunity with ID ${id} not found` }, 404);
             }
-        })();
+            sendJSON(res, { success: true }, 200);
+        } catch (error) {
+            console.error("Error deleting opportunity:", error);
+            sendJSON(res, { error: "Database error" }, 500);
+        }
     } else {
         sendJSON(res, { error: "Operation Not Found" }, 404);
     }
 };
+
 
 // Helper function to send JSON response
 const sendJSON = (res, data, statusCode = 200) => {

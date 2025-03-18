@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Login - GoodNeighbor</title>
+    <link rel="stylesheet" type="text/css" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>GoodNeighbor</h1>
+        <nav id="navAuth">
+            <a href="/index.html">Home</a>
+            <a href="/events.html">Events</a>
+            <a href="/register.html" id="registerLink">Register</a>
+            <a href="/profile.html">Profile</a>
+            <button id="logoutButton" onclick="logoutUser()" style="display: none;">Logout</button>
+        </nav>
+    </header>
+
+    <main class="container">
+        <section class="auth-section">
+            <h2>Login</h2>
+            <form id="loginForm">
+                <input type="text" id="loginUsername" placeholder="Username" required>
+                <input type="password" id="loginPassword" placeholder="Password" required>
+                <button type="submit">Login</button>
+            </form>
+            <p>Don't have an account? <a href="register.html">Register here</a></p>
+        </section>
+    </main>
+
+    <script src="auth.js"></script>
+</body>
+</html>
