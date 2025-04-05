@@ -11,6 +11,7 @@ document.addEventListener("DOMContentLoaded", () => {
     updateNav();
 });
 
+// Update navbar based on auth status
 function updateNav() {
     console.log("In updateNav..")
     const navAuth = document.getElementById("navAuth");
@@ -112,15 +113,15 @@ function checkAuthStatus() {
     }
 }
 
+// Attach Auth Header to Requests
+function getAuthHeaders() {
+    const authHeader = sessionStorage.getItem("authHeader");
+    return authHeader ? { "Authorization": authHeader } : {};
+}
+
 // Logout User
 function logoutUser() {
     sessionStorage.removeItem("authHeader");
     alert("Logged out successfully.");
     window.location.href = "login.html"; // Redirect to login
-}
-
-// Attach Auth Header to Requests
-function getAuthHeaders() {
-    const authHeader = sessionStorage.getItem("authHeader");
-    return authHeader ? { "Authorization": authHeader } : {};
 }

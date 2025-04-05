@@ -1,22 +1,21 @@
 document.addEventListener("DOMContentLoaded", () => {
     console.log("Page Loaded");
 
-    // Check if the volunteer list exists before refreshing opportunities
+    // Check if elements exist before adding event listeners or performing actions on them
     if (document.getElementById("opportunityList")) {
         refreshOpportunities();
     }
 
-    // Check if the form exists before adding an event listener
     const form = document.getElementById("opportunityForm");
     if (form) {
         form.addEventListener("submit", addOpportunity);
     }
 
-    // Check if the search field exists before adding event listeners
     const searchButton = document.getElementById("fetchOppByNameButton");
     if (searchButton) {
         searchButton.addEventListener("click", fetchOppByName);
     }
+
 });
 
 // Refresh Volunteer Opportunities
