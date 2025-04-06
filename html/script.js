@@ -34,6 +34,7 @@ const refreshOpportunities = () => {
                 const listItem = document.createElement('li');
                 listItem.innerHTML = `
                     <strong>${opportunity.name}</strong> ${opportunity.location}
+                    <button onclick="signUpForOpp('${opportunity.id}')">Sign Up</button>
                     <button onclick="editOpportunity('${opportunity.id}')">Edit</button>
                     <button onclick="deleteOpportunity('${opportunity.id}')">Delete</button>
                 `;
@@ -179,3 +180,6 @@ async function deleteOpportunity(id) {
         console.error("Error deleting opportunity:", error);
     }
 }
+
+
+// POST: Sign up for opportunity (authenticated users only)

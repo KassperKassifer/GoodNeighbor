@@ -158,7 +158,8 @@ const handleRequest = async (req, res) => {
                 sendJSON(res, { error: "Invalid JSON or database error", details: error.message }, 400);
             }
         });
-    } else if (req.method === "GET") {
+    }
+    else if (req.method === "GET") {
         try {
             let result;
             if (params.name) {

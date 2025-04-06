@@ -10,29 +10,42 @@
     <header>
         <h1>GoodNeighbor</h1>
         <nav id="navAuth">
-            <a href="index.html">Home</a>
-            <a href="events.html">Events</a>
-            <a href="profile.html">Profile</a>
+            <a href="index">Home</a>
+            <a href="events">Events</a>
+            <a href="profile">Profile</a>
         </nav>
     </header>
     
-    <main class="container">
-        <section class="profile">
+    <main>
+        <section class="hero">
             <h2>Your Profile</h2>
-            <p>Track your volunteer hours and signups.</p>
+            <p id="profileUsername">Username: Loading...</p>
+            <p id="profileRole">Role: Loading...</p>
         </section>
-        
-        <section class="api-links">
-            <h2>API Example Links</h2>
-            <ul>
-                <li><a href="#" onclick="fetchAllOpportunities()">Get All Volunteer Opportunities</a></li>
-                <li><a href="#" onclick="fetchOppByName()">Get Opportunity by Name</a></li>
-            </ul>
-            <input type="text" id="oppNameSearch" placeholder="Enter name to search" />
-        </section>
+
+        <div class="container">
+            <section class="volunteer-hours">
+                <h2>Volunteer Hours</h2>
+                <p>Track your volunteer hours and signups.</p>
+                <p id="totalHours">Total Hours: 0</p>
+            </section>
+            
+            <section class="event-signups">
+                <h2>Events You've Signed Up For</h2>
+                <ul id="signedUpEventsList"></ul>
+            </section>
+        </div>
     </main>
     
+    <footer>
+        <p>For API testing</p>
+        <a href="#" onclick="fetchAllOpportunities()">Get All Volunteer Opportunities   OR   </a>
+        <a href="#" onclick="fetchOppByName()">Get Opportunity by Name</a>
+        <input type="text" id="oppNameSearch" placeholder="Enter name to search" />
+    </footer>        
+
     <script src="auth.js"></script>
     <script src="script.js"></script>
+    <script src="profile.js"></script>
 </body>
 </html>
