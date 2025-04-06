@@ -50,7 +50,7 @@ const authenticate = async (auth = '') => {
         const role = result.rows[0].role;
 
         const isValid = await verifyPassword(password, hash);
-        return { authenticated: isValid, role: isValid ? role : null };
+        return { authenticated: isValid, role: isValid ? role : null, username: isValid ? username : null };
     } catch (err) {
         console.error('Error checking user authentication:', err);
         return { authenticated: false };
@@ -132,32 +132,96 @@ const handleRequest = async (req, res) => {
     }
 
     if (req.method === "POST") {
-        if (auth.role !== "admin" && auth.role !== "organization") {
-            return sendJSON(res, { error: "Only organizations can create opportunities" }, 403);
-        }
+        if (path === "/api/signup") {
+            let body = "";
+            req.on("data", chunk => body += chunk);
+            req.on("end", async () => {
+                try {
+                    const { opportunity_id, hours } = JSON.parse(body);
+                    if (!opportunity_id|| !hours) {
+                        return sendJSON(res, { error: "Missing opportunity_id or hours" }, 400);
+                    }
 
-        let body = "";
-        req.on("data", (data) => (body += data));
-        req.on("end", async () => {
-            try {
-                const newEntry = JSON.parse(body);
-                console.log("Parsed JSON successfully:", newEntry);
+                    const username = auth.username;
+                    if (!username) {
+                        return sendJSON(res, { error: "User not found (auth)" }, 404);
+                    }
 
-                if (!newEntry.name || !newEntry.location) {
-                    return sendJSON(res, { error: "Missing 'name' or 'location'" }, 400);
+                    const userResult = await pool.query(
+                        "SELECT id FROM users WHERE LOWER(username) = LOWER($1)", 
+                        [username]
+                    );
+
+                    if (userResult.rows.length === 0) {
+                        return sendJSON(res, { error: "User not found (db)" }, 404);
+                    }
+
+                    const user_id = userResult.rows[0].id;
+
+                    const insertResult = await pool.query(
+                        `INSERT INTO event_signups (user_id, opportunity_id, hours)
+                         VALUES ($1, $2, $3)
+                         RETURNING *`,
+                        [user_id, opportunity_id, hours]
+                    );
+
+                    return sendJSON(res, { success: true, signup: insertResult.rows[0] }, 201);
+                } catch (error) {
+                    console.error("Error signing up for event:", error);
+                    return sendJSON(res, { error: "Database error", details: error.message }, 500);
                 }
-
-                // Insert into database
-                const result = await pool.query(
-                    "INSERT INTO opportunities (name, location) VALUES ($1, $2) RETURNING *",
-                    [newEntry.name, newEntry.location]
-                );
-                sendJSON(res, result.rows[0], 201);
-            } catch (error) {
-                console.error("Error adding opportunity:", error.message);
-                sendJSON(res, { error: "Invalid JSON or database error", details: error.message }, 400);
+            });
+        } else {
+            if (auth.role !== "admin" && auth.role !== "organization") {
+                return sendJSON(res, { error: "Only organizations can create opportunities" }, 403);
             }
-        });
+        
+            let body = "";
+            req.on("data", (data) => (body += data));
+            req.on("end", async () => {
+                try {
+                    const newEntry = JSON.parse(body);
+                    console.log("Parsed JSON successfully:", newEntry);
+
+                    if (!newEntry.name || !newEntry.location) {
+                        return sendJSON(res, { error: "Missing 'name' or 'location'" }, 400);
+                    }
+
+                    // Insert into database
+                    const result = await pool.query(
+                        "INSERT INTO opportunities (name, location) VALUES ($1, $2) RETURNING *",
+                        [newEntry.name, newEntry.location]
+                    );
+                    sendJSON(res, result.rows[0], 201);
+                } catch (error) {
+                    console.error("Error adding opportunity:", error.message);
+                    sendJSON(res, { error: "Invalid JSON or database error", details: error.message }, 400);
+                }
+            });
+        }
+    }
+    else if (req.method === "GET" && path === "/api/signups") {
+        try {
+            const userResult = await pool.query("SELECT id FROM users WHERE username = $1", [auth.username]);
+            const user_id = userResult.rows[0]?.id;
+            if (!user_id) {
+                return sendJSON(res, { error: "User not found" }, 404);
+            }
+
+            const result = await pool.query(
+                `SELECT e.id, o.name, o.location, e.hours
+                 FROM event_signups e
+                 JOIN opportunities o ON e.opportunity_id = o.id
+                 WHERE e.user_id = $1`,
+                [user_id]
+            );
+
+            const totalHours = result.rows.reduce((sum, r) => sum + Number(r.hours), 0);
+            return sendJSON(res, { signups: result.rows, totalHours });
+        } catch (error) {
+            console.error("Error retrieving signups:", error);
+            sendJSON(res, { error: "Database error" }, 500);
+        }
     }
     else if (req.method === "GET") {
         try {

@@ -34,9 +34,10 @@ const refreshOpportunities = () => {
                 const listItem = document.createElement('li');
                 listItem.innerHTML = `
                     <strong>${opportunity.name}</strong> ${opportunity.location}
-                    <button onclick="signUpForOpp('${opportunity.id}')">Sign Up</button>
-                    <button onclick="editOpportunity('${opportunity.id}')">Edit</button>
-                    <button onclick="deleteOpportunity('${opportunity.id}')">Delete</button>
+                    ${sessionStorage.getItem("authHeader") ? `<button onclick="signUpForEvent(${opportunity.id})">Sign Up</button>` : ""}
+                    ${(sessionStorage.getItem("userRole") === "admin" || sessionStorage.getItem("userRole") === "organization") ?
+                        `<button onclick="editOpportunity('${opportunity.id}')">Edit</button>
+                         <button onclick="deleteOpportunity('${opportunity.id}')">Delete</button>` : ""}
                 `;
                 list.appendChild(listItem);
             });
@@ -183,3 +184,34 @@ async function deleteOpportunity(id) {
 
 
 // POST: Sign up for opportunity (authenticated users only)
+async function signUpForEvent(selected_opportunity_id) {
+    const username = sessionStorage.getItem("username");
+    if (!username) {
+        alert("You must be logged in to sign up for an event.");
+        return;
+    }
+
+    const inputHours = prompt("How many hours do you expect to volunteer?");
+    if (!inputHours || isNaN(inputHours)) return alert("Invalid number of hours.");
+
+    try {
+        let response = await fetch("/api/signup", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                ...getAuthHeaders()
+            },
+            body: JSON.stringify({ opportunity_id: selected_opportunity_id, hours: Number(inputHours) })
+        });
+        
+        if (response.ok) {
+            alert("Successfully signed up for event!");
+        } else {
+            let data = await response.json();
+            alert("Signup Failed: " + (data.error || "Unknown error."));
+        }
+    } catch (error) {
+        console.error("Error signing up:", error);
+        alert("An error occurred while signing up.");
+    }
+}
