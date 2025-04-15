@@ -19,7 +19,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // Update navbar based on auth status
 function updateNav() {
-    console.log("In updateNav..")
     const navAuth = document.getElementById("navAuth");
     const authHeader = sessionStorage.getItem("authHeader");
     const userRole = sessionStorage.getItem("userRole"); // Get stored role

@@ -3,6 +3,10 @@ const http = require('http');
 const bcrypt = require("bcrypt");
 require("dotenv").config();
 const { Pool } = require("pg");
+const WebSocket = require("ws");
+
+const wsserver = new WebSocket.WebSocketServer({ noServer: true });
+
 
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
@@ -132,6 +136,7 @@ const handleRequest = async (req, res) => {
     }
 
     if (req.method === "POST") {
+        // Route handling for a user signing up for an event
         if (path === "/api/signup") {
             let body = "";
             req.on("data", chunk => body += chunk);
@@ -171,6 +176,7 @@ const handleRequest = async (req, res) => {
                     return sendJSON(res, { error: "Database error", details: error.message }, 500);
                 }
             });
+        // Route handling for creating a new opportunity/event
         } else {
             if (auth.role !== "admin" && auth.role !== "organization") {
                 return sendJSON(res, { error: "Only organizations can create opportunities" }, 403);
@@ -179,6 +185,9 @@ const handleRequest = async (req, res) => {
             let body = "";
             req.on("data", (data) => (body += data));
             req.on("end", async () => {
+                const opportunity = JSON.parse(body);
+                console.log("Parsed JSON successfully:", opportunity);
+                
                 try {
                     const {
                         name,
@@ -190,11 +199,10 @@ const handleRequest = async (req, res) => {
                         contact_name,
                         contact_email,
                         contact_phone
-                    } = JSON.parse(body);
-                    console.log("Parsed JSON successfully:", newEntry);
+                    } = opportunity;
 
                     // Basic validation
-                    if (!newEntry.name || !newEntry.location) {
+                    if (!name || !location) {
                         return sendJSON(res, { error: "Missing 'name' or 'location'" }, 400);
                     }
 
@@ -202,11 +210,12 @@ const handleRequest = async (req, res) => {
                     const result = await pool.query(`
                         INSERT INTO opportunities (
                             name, location, description, event_date, start_time, end_time, 
-                            contact_name, contact_email, contact_phone
-                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) 
+                            contact_name, contact_email, contact_phone, modified_by
+                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) 
                         RETURNING *`,
-                        [name, location, description, event_date, start_time, end_time, contact_name, contact_email, contact_phone]
+                        [name, location, description, event_date, start_time, end_time, contact_name, contact_email, contact_phone, auth.username]
                     );
+                    notifyAll(`New Opportunity: ${name} at ${location}`);
                     sendJSON(res, result.rows[0], 201);
                 } catch (error) {
                     console.error("Error adding opportunity:", error.message);
@@ -287,6 +296,7 @@ const handleRequest = async (req, res) => {
             sendJSON(res, { error: "Database error" }, 500);
         }
     } 
+    // Route handling for updating an opportunity
     else if (req.method === "PUT") {
         console.log("In PUT route..")
         if (auth.role !== "admin" && auth.role !== "organization") {
@@ -298,7 +308,20 @@ const handleRequest = async (req, res) => {
         req.on("data", (data) => (body += data));
         req.on("end", async () => {
             try {
-                const {
+                const raw = JSON.parse(body);
+
+                const name = raw.name || "";
+                const location = raw.location || "";
+                const description = raw.description || "";
+
+                const event_date = raw.event_date?.trim() ? raw.event_date : null;
+                const start_time = raw.start_time?.trim() ? raw.start_time : null;
+                const end_time = raw.end_time?.trim() ? raw.end_time : null;
+
+                const contact_name = raw.contact_name || "";
+                const contact_email = raw.contact_email || "";
+                const contact_phone = raw.contact_phone || "";
+                console.log("Editing opportunity with values:", {
                     name,
                     location,
                     description,
@@ -308,7 +331,7 @@ const handleRequest = async (req, res) => {
                     contact_name,
                     contact_email,
                     contact_phone
-                } = JSON.parse(body);
+                });
     
                 const result = await pool.query(
                     `UPDATE opportunities SET
@@ -320,7 +343,8 @@ const handleRequest = async (req, res) => {
                         end_time = $6,
                         contact_name = $7,
                         contact_email = $8,
-                        contact_phone = $9
+                        contact_phone = $9,
+                        modified_by = $11
                      WHERE id = $10
                      RETURNING *`,
                     [
@@ -333,7 +357,8 @@ const handleRequest = async (req, res) => {
                         contact_name,
                         contact_email,
                         contact_phone,
-                        id
+                        id,
+                        auth.username
                     ]
                 );
     
@@ -342,6 +367,7 @@ const handleRequest = async (req, res) => {
                 }
     
                 console.log("Updated opportunity:", result.rows[0]);
+                notifyAll(`Opportunity Updated: ${name}`);
                 sendJSON(res, result.rows[0], 200);
             } catch (error) {
                 console.error("Error updating opportunity:", error.message);
@@ -382,5 +408,39 @@ const sendJSON = (res, data, statusCode = 200) => {
 };
 
 const server = http.createServer(handleRequest);
+
+let sockets = [];
+wsserver.on('connection', (ws) => {
+    sockets.push(ws);
+    console.log("WebSocket client connected");
+
+    ws.send(JSON.stringify({ type: "welcome", message: "Connected to GoodNeighbor updates!" }));
+
+    ws.on("close", () => {
+        sockets = sockets.filter(s => s !== ws);
+    });
+
+});
+
+// Upgrade handler for WebSocket connections at /ws
+server.on("upgrade", (req, socket, head) => {
+    if (req.url === "/ws") {
+        wsserver.handleUpgrade(req, socket, head, (ws) => {
+            wsserver.emit("connection", ws, req);
+        });
+    } else {
+        socket.destroy();
+    }
+});
+
+// Helper function to broadcast a string with WebSocket
+const notifyAll = (message) => {
+    sockets.forEach(ws => {
+        if (ws.readyState === ws.OPEN) {
+            ws.send(JSON.stringify({ type: "opportunity", message }));
+        }
+    });
+};
+
 
 server.listen(3000, () => console.log("Good Neighbor API running on port 3000"));
