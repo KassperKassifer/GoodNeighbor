@@ -28,6 +28,27 @@
         </section>
     </main>
     
+    <!-- Edit Opportunity Modal -->
+    <div id="editModal" class="modal" style="display: none;">
+        <div class="modal-content">
+        <h2>Edit Opportunity</h2>
+        <form id="editForm">
+            <input type="hidden" id="editId">
+            <input type="text" id="editName" placeholder="Name" required>
+            <input type="text" id="editLocation" placeholder="Location" required>
+            <textarea id="editDescription" placeholder="Description"></textarea>
+            <input type="date" id="editEventDate">
+            <input type="time" id="editStartTime">
+            <input type="time" id="editEndTime">
+            <input type="text" id="editContactName" placeholder="Contact Name">
+            <input type="email" id="editContactEmail" placeholder="Contact Email">
+            <input type="tel" id="editContactPhone" placeholder="Contact Phone">
+            <button type="submit">Save</button>
+            <button type="button" onclick="closeEditModal()">Cancel</button>
+        </form>
+        </div>
+    </div>
+
     <script src="auth.js"></script>
     <script src="script.js"></script>
 </body>

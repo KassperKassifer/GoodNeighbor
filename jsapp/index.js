@@ -117,7 +117,7 @@ const handleRequest = async (req, res) => {
 
     let auth = await authenticate(req.headers.authorization);
 
-    // Admin registering other users
+    // Admin registering other users (currently nonfunctional)
     if (path === "/register-admin") {
         if (!auth.authenticated || auth.role !== "admin") {
             return sendJSON(res, { error: "Only admins can create new users" }, 403);
@@ -180,17 +180,32 @@ const handleRequest = async (req, res) => {
             req.on("data", (data) => (body += data));
             req.on("end", async () => {
                 try {
-                    const newEntry = JSON.parse(body);
+                    const {
+                        name,
+                        location,
+                        description,
+                        event_date,
+                        start_time,
+                        end_time,
+                        contact_name,
+                        contact_email,
+                        contact_phone
+                    } = JSON.parse(body);
                     console.log("Parsed JSON successfully:", newEntry);
 
+                    // Basic validation
                     if (!newEntry.name || !newEntry.location) {
                         return sendJSON(res, { error: "Missing 'name' or 'location'" }, 400);
                     }
 
                     // Insert into database
-                    const result = await pool.query(
-                        "INSERT INTO opportunities (name, location) VALUES ($1, $2) RETURNING *",
-                        [newEntry.name, newEntry.location]
+                    const result = await pool.query(`
+                        INSERT INTO opportunities (
+                            name, location, description, event_date, start_time, end_time, 
+                            contact_name, contact_email, contact_phone
+                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) 
+                        RETURNING *`,
+                        [name, location, description, event_date, start_time, end_time, contact_name, contact_email, contact_phone]
                     );
                     sendJSON(res, result.rows[0], 201);
                 } catch (error) {
@@ -200,6 +215,7 @@ const handleRequest = async (req, res) => {
             });
         }
     }
+    // Retrieve events the user has signed up for
     else if (req.method === "GET" && path === "/api/signups") {
         try {
             const userResult = await pool.query("SELECT id FROM users WHERE username = $1", [auth.username]);
@@ -223,7 +239,8 @@ const handleRequest = async (req, res) => {
             sendJSON(res, { error: "Database error" }, 500);
         }
     }
-    else if (req.method === "GET") {
+    // Retrieve opportunities
+    else if (req.method === "GET" && path === "/api/events") {
         try {
             let result;
             if (params.name) {
@@ -240,39 +257,100 @@ const handleRequest = async (req, res) => {
             console.error("Error fetching opportunities:", error);
             sendJSON(res, { error: "Database error" }, 500);
         }
-    } else if (req.method === "PUT") {
-        if (auth.role !== "admin" && auth.role !== "organization") {
-            return sendJSON(res, { error: "Only organizations can update opportunities" }, 403);
+    }
+    // Return auth info
+    else if (req.method === "GET" && path === "/api/login") {
+        if (!auth.authenticated) {
+            return sendJSON(res, { error: "Invalid credentials" }, 401);
         }
-
+        return sendJSON(res, {
+            username: auth.username,
+            role: auth.role
+        });
+    }
+    // Return opportunity details
+    else if (req.method === "GET") {
+        if (auth.role !== "admin" && auth.role !== "organization") {
+            return sendJSON(res, { error: "Only organizations or admins can update opportunities" }, 403);
+        }
+        const id = path.split("/")[2];
+        try {
+            const result = await pool.query("SELECT * FROM opportunities WHERE id = $1", [id]);
+    
+            if (result.rows.length === 0) {
+                return sendJSON(res, { error: "Opportunity not found" }, 404);
+            }
+    
+            sendJSON(res, result.rows[0]);
+        } catch (error) {
+            console.error("Error fetching opportunity by ID:", error.message);
+            sendJSON(res, { error: "Database error" }, 500);
+        }
+    } 
+    else if (req.method === "PUT") {
+        console.log("In PUT route..")
+        if (auth.role !== "admin" && auth.role !== "organization") {
+            return sendJSON(res, { error: "Only organizations or admins can update opportunities" }, 403);
+        }
+    
         const id = path.split("/")[2];
         let body = "";
         req.on("data", (data) => (body += data));
         req.on("end", async () => {
             try {
-                const updatedEntry = JSON.parse(body);
-                console.log("Received update request:", updatedEntry);
-
-                // Update the opportunity in the database
+                const {
+                    name,
+                    location,
+                    description,
+                    event_date,
+                    start_time,
+                    end_time,
+                    contact_name,
+                    contact_email,
+                    contact_phone
+                } = JSON.parse(body);
+    
                 const result = await pool.query(
-                    "UPDATE opportunities SET name = $1, location = $2 WHERE id = $3 RETURNING *",
-                    [updatedEntry.name, updatedEntry.location, id]
+                    `UPDATE opportunities SET
+                        name = $1,
+                        location = $2,
+                        description = $3,
+                        event_date = $4,
+                        start_time = $5,
+                        end_time = $6,
+                        contact_name = $7,
+                        contact_email = $8,
+                        contact_phone = $9
+                     WHERE id = $10
+                     RETURNING *`,
+                    [
+                        name,
+                        location,
+                        description,
+                        event_date,
+                        start_time,
+                        end_time,
+                        contact_name,
+                        contact_email,
+                        contact_phone,
+                        id
+                    ]
                 );
-
+    
                 if (result.rows.length === 0) {
                     return sendJSON(res, { error: "Opportunity not found" }, 404);
                 }
-
+    
                 console.log("Updated opportunity:", result.rows[0]);
                 sendJSON(res, result.rows[0], 200);
             } catch (error) {
                 console.error("Error updating opportunity:", error.message);
-                if (!res.headersSent) {
-                    sendJSON(res, { error: "Invalid JSON or Update Failed", details: error.message }, 400);
-                }
+                sendJSON(res, { error: "Update failed", details: error.message }, 500);
             }
         });
-    } else if (req.method === "DELETE") {
+    }
+    //Delete opportunity
+    else if (req.method === "DELETE") {
         if (auth.role !== "admin" && auth.role !== "organization") {
             return sendJSON(res, { error: "Only organizations can delete opportunities" }, 403);
         }
@@ -304,4 +382,5 @@ const sendJSON = (res, data, statusCode = 200) => {
 };
 
 const server = http.createServer(handleRequest);
+
 server.listen(3000, () => console.log("Good Neighbor API running on port 3000"));

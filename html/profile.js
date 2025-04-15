@@ -4,15 +4,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
 function loadUserProfile() {
     const username = sessionStorage.getItem("username");
+    const userRole = sessionStorage.getItem("userRole");
     const usernameElement = document.getElementById("profileUsername");
+    const userRoleElement = document.getElementById("profileRole");
 
     if (usernameElement) {
         usernameElement.textContent = `Username: ${username || "Not logged in"}`;
     }
-
-    // Placeholder values for now
-    document.getElementById("profileRole").textContent = "Role: (not fetched)";
-    document.getElementById("totalHours").textContent = "Total Hours: 0";
+    if(userRoleElement){
+        userRoleElement.textContent = `Role: ${userRole || "Not logged in"}`;
+    }
 
     // Fetch event signups and hours here (note for later)
     loadUserEventSignups();

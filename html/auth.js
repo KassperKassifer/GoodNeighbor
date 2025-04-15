@@ -27,10 +27,10 @@ function updateNav() {
     if (authHeader) {
         // User is logged in -> Show Logout & Profile
         navAuth.innerHTML = `
-            <a href="/index">Home</a>
-            <a href="/events">Events</a>
-            <a href="/profile">Profile</a>
-            ${userRole === "admin" ? `<a href="/admin">Manage Users</a>` : ""}
+            <a href="/index.html">Home</a>
+            <a href="/events.html">Events</a>
+            <a href="/profile.html">Profile</a>
+            ${userRole === "admin" ? `<a href="/admin.html">Manage Users</a>` : ""}
             <a href="#" id="logoutLink">Logout</a>
         `;
 
@@ -38,9 +38,9 @@ function updateNav() {
     } else {
         // User is logged out -> Show Login
         navAuth.innerHTML = `
-            <a href="/index">Home</a>
-            <a href="/events">Events</a>
-            <a href="/login">Login</a>
+            <a href="/index.html">Home</a>
+            <a href="/events.html">Events</a>
+            <a href="/login.html">Login</a>
         `;
     }
 }
@@ -66,7 +66,7 @@ async function registerUser(event) {
         let data = await response.json();
         if (response.ok) {
             alert("Registration successful! Please log in.");
-            window.location.href = "/login"; // Redirect to login page
+            window.location.href = "/login.html"; // Redirect to login page
         } else {
             alert("Error: " + data.error);
         }
@@ -89,18 +89,20 @@ async function loginUser(event) {
     const authHeader = "Basic " + btoa(username + ":" + password);
 
     try {
-        let response = await fetch("/api", {
+        let response = await fetch("/api/login", {
             method: "GET",
             headers: { "Authorization": authHeader }
         });
 
         let data = await response.json();
+        console.log("Data from loginUser:", data)
 
         if (response.ok) {
             sessionStorage.setItem("authHeader", authHeader);
-            sessionStorage.setItem("username", username); // Store user's username
+            sessionStorage.setItem("username", data.username); // Store user's username
+            sessionStorage.setItem("userRole", data.role);
             alert("Login successful!");
-            window.location.href = "/index"; // Redirect to homepage
+            window.location.href = "/index.html"; // Redirect to homepage
         } else {
             alert("Invalid credentials: " + data.error);
         }
@@ -131,5 +133,5 @@ function logoutUser() {
     sessionStorage.removeItem("userRole");
     sessionStorage.removeItem("username");
     alert("Logged out successfully.");
-    window.location.href = "/login"; // Redirect to login
+    window.location.href = "/login.html"; // Redirect to login
 }

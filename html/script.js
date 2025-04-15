@@ -16,13 +16,52 @@ document.addEventListener("DOMContentLoaded", () => {
         searchButton.addEventListener("click", fetchOppByName);
     }
 
+    const editForm = document.getElementById("editForm");
+    if (editForm) {
+        editForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+
+            const id = document.getElementById("editId").value;
+            const updated = {
+                name: document.getElementById("editName").value,
+                location: document.getElementById("editLocation").value,
+                description: document.getElementById("editDescription").value,
+                event_date: document.getElementById("editEventDate").value,
+                start_time: document.getElementById("editStartTime").value,
+                end_time: document.getElementById("editEndTime").value,
+                contact_name: document.getElementById("editContactName").value,
+                contact_email: document.getElementById("editContactEmail").value,
+                contact_phone: document.getElementById("editContactPhone").value
+            };
+
+            try {
+                const response = await fetch(`/api/${id}`, {
+                    method: "PUT",
+                    headers: {
+                        "Content-Type": "application/json",
+                        ...getAuthHeaders()
+                    },
+                    body: JSON.stringify(updated)
+                });
+
+                if (!response.ok) throw new Error("Failed to update opportunity");
+
+                alert("Opportunity updated successfully!");
+                closeEditModal();
+                refreshOpportunities(); // Refresh event list
+            } catch (error) {
+                console.error("Error updating opportunity:", error);
+                alert("Update failed. See console for details.");
+            }
+        });
+    }
 });
 
 // Refresh Volunteer Opportunities
 const refreshOpportunities = () => {
     console.log("Refreshing volunteer opportunities...");
 
-    fetch('/api')
+    fetch('/api/events')
         .then(body => body.json())
         .then(opportunities => {
             const list = document.getElementById("opportunityList");
@@ -36,8 +75,8 @@ const refreshOpportunities = () => {
                     <strong>${opportunity.name}</strong> ${opportunity.location}
                     ${sessionStorage.getItem("authHeader") ? `<button onclick="signUpForEvent(${opportunity.id})">Sign Up</button>` : ""}
                     ${(sessionStorage.getItem("userRole") === "admin" || sessionStorage.getItem("userRole") === "organization") ?
-                        `<button onclick="editOpportunity('${opportunity.id}')">Edit</button>
-                         <button onclick="deleteOpportunity('${opportunity.id}')">Delete</button>` : ""}
+                        `<button onclick='openEditModal(${JSON.stringify(opportunity)})'>Edit</button>
+                         <button onclick='deleteOpportunity('${opportunity.id}')'>Delete</button>` : ""}
                 `;
                 list.appendChild(listItem);
             });
@@ -139,26 +178,45 @@ async function fetchOppByName() {
 
 // PUT: Edit an existing opportunity
 async function editOpportunity(id) {
-    const newName = prompt("Enter new opportunity name:");
-    const newLocation = prompt("Enter new location:");
-
-    if (!newName || !newLocation) return;
+    console.log("In editOpportunity()...")
+    // Show a modal or form to collect updated info
+    const name = document.getElementById("editName").value;
+    const location = document.getElementById("editLocation").value;
+    const description = document.getElementById("editDescription").value || "";
+    const event_date = document.getElementById("editDate").value;
+    const start_time = document.getElementById("editStartTime").value || "";
+    const end_time = document.getElementById("editEndTime").value || "";
+    const contact_name = document.getElementById("editContactName").value || "";
+    const contact_email = document.getElementById("editContactEmail").value || "";
+    const contact_phone = document.getElementById("editContactPhone").value || "";
 
     try {
-        let response = await fetch(`/api/${id}`, {
+        const response = await fetch(`/api/${id}`, {
             method: "PUT",
-            headers: { 
+            headers: {
                 "Content-Type": "application/json",
                 "Authorization": sessionStorage.getItem("authHeader")
             },
-            body: JSON.stringify({ name: newName, location: newLocation })
+            body: JSON.stringify({
+                name,
+                location,
+                description,
+                event_date,
+                start_time,
+                end_time,
+                contact_name,
+                contact_email,
+                contact_phone
+            })
         });
 
         if (!response.ok) throw new Error("Failed to edit opportunity");
 
-        refreshOpportunities(); // Update the list after editing
+        refreshOpportunities(); // Refresh the event list
+        alert("Opportunity updated!");
     } catch (error) {
         console.error("Error editing opportunity:", error);
+        alert("An error occurred while updating the opportunity.");
     }
 }
 
@@ -215,3 +273,24 @@ async function signUpForEvent(selected_opportunity_id) {
         alert("An error occurred while signing up.");
     }
 }
+
+// Open and populate opportunity editor modal
+function openEditModal(opportunity) {
+    console.log("Editing opportunity ID:", opportunity.id);
+    document.getElementById("editId").value = opportunity.id;
+    document.getElementById("editName").value = opportunity.name;
+    document.getElementById("editLocation").value = opportunity.location || "";
+    document.getElementById("editDescription").value = opportunity.description || "";
+    document.getElementById("editEventDate").value = opportunity.event_date || "";
+    document.getElementById("editStartTime").value = opportunity.start_time || "";
+    document.getElementById("editEndTime").value = opportunity.end_time || "";
+    document.getElementById("editContactName").value = opportunity.contact_name || "";
+    document.getElementById("editContactEmail").value = opportunity.contact_email || "";
+    document.getElementById("editContactPhone").value = opportunity.contact_phone || "";
+    document.getElementById("editModal").style.display = "flex";
+    editOpportunity(opportunity.id);
+  }
+  
+  function closeEditModal() {
+    document.getElementById("editModal").style.display = "none";
+  }
