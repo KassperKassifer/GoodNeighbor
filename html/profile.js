@@ -15,7 +15,7 @@ function loadUserProfile() {
         userRoleElement.textContent = `Role: ${userRole || "Not logged in"}`;
     }
 
-    // Fetch event signups and hours here (note for later)
+    // Fetch event signups and hours
     loadUserEventSignups();
 }
 
@@ -42,6 +42,11 @@ async function loadUserEventSignups() {
                 console.log(ev)
                 const item = document.createElement("li");
                 item.textContent = `${ev.name} (${ev.location}) - ${ev.hours || 0} hrs`;
+
+                const cancelBtn = document.createElement("button");
+                cancelBtn.textContent = "Cancel Signup";
+                cancelBtn.onclick = () => cancelSignup(ev.opportunity_id);
+                item.appendChild(cancelBtn);
                 listElement.appendChild(item);
             });
         } else {
@@ -52,5 +57,25 @@ async function loadUserEventSignups() {
         hoursElement.textContent = `Total Hours: ${data.totalHours || 0}`;
     } catch (error) {
         console.error("Error loading user events:", error);
+    }
+}
+
+async function cancelSignup(opportunityId) {
+    console.log("Canceling signup for:", opportunityId);
+    if (!confirm("Are you sure you want to cancel this signup?")) return;
+
+    try {
+        const response = await fetch(`/api/signups/${opportunityId}`, {
+            method: "DELETE",
+            headers: getAuthHeaders()
+        });
+
+        if (!response.ok) throw new Error("Failed to cancel signup");
+
+        showToast("Successfully canceled successfully!", "success");
+        loadUserEventSignups(); // refresh signed-up list
+    } catch (err) {
+        console.error("Cancel signup failed:", err);
+        showToast("Something went wrong while canceling.", "error");
     }
 }

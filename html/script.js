@@ -23,39 +23,75 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // Refresh Volunteer Opportunities
-const refreshOpportunities = () => {
+const refreshOpportunities = async () => {
     console.log("Refreshing volunteer opportunities...");
 
-    fetch('/api/events')
-        .then(body => body.json())
-        .then(opportunities => {
-            const list = document.getElementById("opportunityList");
-            if (!list) return; // Ensure the element exists
+    try {
+        // Fetch both events and user signups in parallel
+        const [eventRes, signupRes] = await Promise.all([
+            fetch('/api/events'),
+            fetch('/api/signups', { headers: getAuthHeaders() })
+        ]);
 
-            list.innerHTML = "";
+        if (!eventRes.ok || !signupRes.ok) {
+            throw new Error("Failed to fetch events or signups");
+        }
 
-            opportunities.forEach((opportunity) => {
-                const listItem = document.createElement('li');
-                listItem.innerHTML = `
-                    <div class="opportunity-content">
-                        <strong>${opportunity.name}</strong> ${opportunity.location}
-                        <br><em>Last modified by: ${opportunity.modified_by || "Unknown"}</em>
-                    </div>
+        const opportunities = await eventRes.json();
+        const signups = await signupRes.json();
+        const signedUpEventIds = signups.signups.map(s => s.opportunity_id);
 
-                    <div class="button-group">
-                        ${sessionStorage.getItem("userRole") === "user" ? `<button onclick="signUpForEvent(${opportunity.id})">Sign Up</button>` : ""}
-                        ${(sessionStorage.getItem("userRole") === "admin" || sessionStorage.getItem("userRole") === "organization") ?
-                            `<button onclick='openEditModal(${JSON.stringify(opportunity)})'>Edit</button>
-                            <button onclick="deleteOpportunity(${opportunity.id})">Delete</button>` : ""}
-                    </div>
-                `;
-                list.appendChild(listItem);
-            });
+        const list = document.getElementById("opportunityList");
+        if (!list) return;
 
-            console.log("Fetched Volunteer Opportunities:", opportunities);
-        })
-        .catch(error => console.error("Error fetching volunteer opportunities:", error));
+        list.innerHTML = "";
+
+        opportunities.forEach((opportunity) => {
+            const listItem = document.createElement('li');
+
+            const userRole = sessionStorage.getItem("userRole");
+            const userHasSignedUp = signedUpEventIds.includes(opportunity.id);
+
+            listItem.innerHTML = `
+                <div class="opportunity-content">
+                    <strong>${opportunity.name}</strong> ${opportunity.location}
+                    <br><em>Last modified by: ${opportunity.modified_by || "Unknown"}</em>
+                </div>
+
+                <div class="button-group">
+                    ${
+                        userRole === "user" 
+                            ? (!userHasSignedUp
+                                ? `<button onclick="signUpForEvent(${opportunity.id})">Sign Up</button>`
+                                : `<span class="badge success">Signed Up</span>`)
+                            : ""
+                    }
+                    ${
+                        (userRole === "admin" || userRole === "organization")
+                            ? `<button onclick='openEditModal(${JSON.stringify(opportunity)})'>Edit</button>
+                               <button onclick="deleteOpportunity(${opportunity.id})">Delete</button>`
+                            : ""
+                    }
+                </div>
+            `;
+
+            list.appendChild(listItem);
+        });
+
+        console.log("Fetched Volunteer Opportunities:", opportunities);
+    } catch (error) {
+        console.error("Error refreshing volunteer opportunities:", error);
+    }
 };
+
+function showToast(msg, type = "info") {
+    const toast = document.createElement("div");
+    toast.className = `toast toast-${type}`;
+    toast.textContent = msg;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.classList.add("fade-out"), 3000);
+    setTimeout(() => toast.remove(), 4000);
+}
 
 // POST new volunteer
 async function addOpportunity(event) {
@@ -112,10 +148,10 @@ async function fetchAllOpportunities() {
 
         let data = await response.json();
         console.log("All Volunteer Opportunities:", data);
-        alert(JSON.stringify(data, null, 2)); // Show data in an alert box
+        alert(JSON.stringify(data, null, 2));
     } catch (error) {
         console.error("Error fetching all volunteers:", error);
-        alert("Error fetching volunteers. Check console for details.");
+        showToast("Error fetching volunteers. Check console for details.", "error");
     }
 }
 
@@ -129,7 +165,7 @@ async function fetchOppByName() {
 
     let name = searchField.value;
     if (!name) {
-        alert("Please enter a name to search.");
+        showToast("Please enter a name to search.", "error");
         return;
     }
 
@@ -143,7 +179,7 @@ async function fetchOppByName() {
         alert(JSON.stringify(data, null, 2));
     } catch (error) {
         console.error("Error fetching opportunity by name:", error);
-        alert("Error fetching opportunity. Check console for details.");
+        showToast("Error fetching opportunity. Check console for details.", "error");
     }
 }
 
@@ -172,12 +208,12 @@ async function deleteOpportunity(id) {
 async function signUpForEvent(selected_opportunity_id) {
     const username = sessionStorage.getItem("username");
     if (!username) {
-        alert("You must be logged in to sign up for an event.");
+        showToast("You must be logged in to sign up for an event.");
         return;
     }
 
     const inputHours = prompt("How many hours do you expect to volunteer?");
-    if (!inputHours || isNaN(inputHours)) return alert("Invalid number of hours.");
+    if (!inputHours || isNaN(inputHours)) return showToast("Invalid number of hours.", "error");
 
     try {
         let response = await fetch("/api/signup", {
@@ -190,14 +226,14 @@ async function signUpForEvent(selected_opportunity_id) {
         });
         
         if (response.ok) {
-            alert("Successfully signed up for event!");
+            showToast("Successfully signed up for event!", "success");
         } else {
             let data = await response.json();
-            alert("Signup Failed: " + (data.error || "Unknown error."));
+            showToast("Signup Failed: " + (data.error || "Unknown error."), "error");
         }
     } catch (error) {
         console.error("Error signing up:", error);
-        alert("An error occurred while signing up.");
+        showToast("An error occurred while signing up.", "error");
     }
 }
 
@@ -238,10 +274,10 @@ async function editOpportunity(id) {
         if (!response.ok) throw new Error("Failed to edit opportunity");
 
         refreshOpportunities(); // Refresh the event list
-        alert("Opportunity updated!");
+        showToast("Opportunity updated!", "success");
     } catch (error) {
         console.error("Error editing opportunity:", error);
-        alert("An error occurred while updating the opportunity.");
+        showToast("An error occurred while updating the opportunity.", "error");
     }
 }
 
@@ -263,7 +299,7 @@ async function editOpportunityFormHandler(e) {
 
     // Client-side validation
     if (!updated.name.trim() || !updated.location.trim()) {
-        alert("Please fill in all required fields (Name and Location).");
+        showToast("Please fill in all required fields (Name and Location).");
         return;
     }
 
@@ -272,7 +308,7 @@ async function editOpportunityFormHandler(e) {
         const today = new Date();
         today.setHours(0, 0, 0, 0); // Ignore time when comparing
         if (selectedDate < today) {
-            alert("Event date cannot be in the past.");
+            showToast("Event date cannot be in the past.");
             return;
         }
     }
@@ -289,12 +325,12 @@ async function editOpportunityFormHandler(e) {
 
         if (!response.ok) throw new Error("Failed to update opportunity");
 
-        alert("Opportunity updated successfully!");
+        showToast("Opportunity updated successfully!", "success");
         closeEditModal();
         refreshOpportunities();
     } catch (error) {
         console.error("Error updating opportunity:", error);
-        alert("Update failed. See console for details.");
+        showToast("Update failed. See console for details.", "error");
     }
 }
 

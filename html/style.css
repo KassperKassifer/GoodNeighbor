@@ -176,6 +176,16 @@ ul {
     font-size: 0.9rem;
 }
 
+.badge.success {
+    background-color: #4CAF50;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    display: inline-block;
+    margin-top: 4px;
+}
+
 /* Stack vertically on smaller screens */
 @media (max-width: 600px) {
     .opportunity-list li {
@@ -316,6 +326,18 @@ ul {
     opacity: 1;
     transition: opacity 0.5s ease, transform 0.5s ease;
     animation: slideIn 0.4s ease forwards;
+}
+
+.toast-success {
+    background: #4CAF50;
+}
+
+.toast-error {
+    background: #f44336;
+}
+
+.toast-info {
+    background: #1e88e5;
 }
 
 @keyframes slideIn {

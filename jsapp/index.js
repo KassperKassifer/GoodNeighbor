@@ -234,7 +234,7 @@ const handleRequest = async (req, res) => {
             }
 
             const result = await pool.query(
-                `SELECT e.id, o.name, o.location, e.hours
+                `SELECT e.id, e.opportunity_id, o.name, o.location, e.hours
                  FROM event_signups e
                  JOIN opportunities o ON e.opportunity_id = o.id
                  WHERE e.user_id = $1`,
@@ -374,6 +374,30 @@ const handleRequest = async (req, res) => {
                 sendJSON(res, { error: "Update failed", details: error.message }, 500);
             }
         });
+    }
+    else if (req.method === "DELETE" && path.startsWith("/api/signups/")) {
+        // Delete an event sign-up instance
+        const opportunityId = path.split("/").pop();
+        console.log("Matched DELETE /api/signups/* route with opportunityId =", opportunityId);
+
+        try {
+            const userResult = await pool.query("SELECT id FROM users WHERE username = $1", [auth.username]);
+            const userId = userResult.rows[0]?.id;
+    
+            if (!userId) {
+                return sendJSON(res, { error: "User not found" }, 404);
+            }
+    
+            await pool.query(
+                "DELETE FROM event_signups WHERE user_id = $1 AND opportunity_id = $2",
+                [userId, opportunityId]
+            );
+    
+            return sendJSON(res, { message: "Signup cancelled" }, 200);
+        } catch (error) {
+            console.error("Error cancelling signup:", error);
+            return sendJSON(res, { error: "Server error" }, 500);
+        }
     }
     //Delete opportunity
     else if (req.method === "DELETE") {
