@@ -37,12 +37,17 @@ const refreshOpportunities = () => {
             opportunities.forEach((opportunity) => {
                 const listItem = document.createElement('li');
                 listItem.innerHTML = `
-                    <strong>${opportunity.name}</strong> ${opportunity.location}
-                    <br><em>Last modified by: ${opportunity.modified_by || "Unknown"}</em>
-                    ${sessionStorage.getItem("authHeader") ? `<button onclick="signUpForEvent(${opportunity.id})">Sign Up</button>` : ""}
-                    ${(sessionStorage.getItem("userRole") === "admin" || sessionStorage.getItem("userRole") === "organization") ?
-                        `<button onclick='openEditModal(${JSON.stringify(opportunity)})'>Edit</button>
-                         <button onclick="deleteOpportunity(${opportunity.id})">Delete</button>` : ""}
+                    <div class="opportunity-content">
+                        <strong>${opportunity.name}</strong> ${opportunity.location}
+                        <br><em>Last modified by: ${opportunity.modified_by || "Unknown"}</em>
+                    </div>
+
+                    <div class="button-group">
+                        ${sessionStorage.getItem("userRole") === "user" ? `<button onclick="signUpForEvent(${opportunity.id})">Sign Up</button>` : ""}
+                        ${(sessionStorage.getItem("userRole") === "admin" || sessionStorage.getItem("userRole") === "organization") ?
+                            `<button onclick='openEditModal(${JSON.stringify(opportunity)})'>Edit</button>
+                            <button onclick="deleteOpportunity(${opportunity.id})">Delete</button>` : ""}
+                    </div>
                 `;
                 list.appendChild(listItem);
             });
@@ -101,7 +106,7 @@ async function addOpportunity(event) {
 // GET all volunteers
 async function fetchAllOpportunities() {
     try {
-        let response = await fetch("/api");
+        let response = await fetch("/api/events");
 
         if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
 
@@ -255,6 +260,22 @@ async function editOpportunityFormHandler(e) {
         contact_email: document.getElementById("editContactEmail")?.value || "",
         contact_phone: document.getElementById("editContactPhone")?.value || ""
     };
+
+    // Client-side validation
+    if (!updated.name.trim() || !updated.location.trim()) {
+        alert("Please fill in all required fields (Name and Location).");
+        return;
+    }
+
+    if (updated.event_date) {
+        const selectedDate = new Date(updated.event_date);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // Ignore time when comparing
+        if (selectedDate < today) {
+            alert("Event date cannot be in the past.");
+            return;
+        }
+    }
 
     try {
         const response = await fetch(`/api/${id}`, {

@@ -3,7 +3,8 @@
     box-sizing: border-box;
 }
 
-html, body {
+html,
+body {
     margin: 0;
     padding: 0;
 }
@@ -11,7 +12,7 @@ html, body {
 body {
     font-family: 'Arial', sans-serif;
     background-color: rgb(240, 210, 100);
-    color: rgb(96, 198, 166); 
+    color: rgb(96, 198, 166);
     display: flex;
     flex-direction: column;
     min-height: 100vh;
@@ -44,8 +45,9 @@ header {
     font-weight: 700;
     letter-spacing: 0.1em;
     text-shadow: 0.1em 0.1em 0.2em rgba(0, 0, 0, 0.2);
-    max-width: 100%; /* Prevents overflow */
-    text-align: center;    
+    max-width: 100%;
+    /* Prevents overflow */
+    text-align: center;
 }
 
 header h1 {
@@ -92,12 +94,14 @@ main {
 
 section {
     width: 100%;
-    align-self: center; /* Centers section in the grid */
+    align-self: center;
+    /* Centers section in the grid */
     text-align: center;
 }
 
 .hero {
-    background: linear-gradient(135deg, rgb(65, 170, 210), rgb(96, 198, 166)); /* Sky Blue to Teal gradient */
+    background: linear-gradient(135deg, rgb(65, 170, 210), rgb(96, 198, 166));
+    /* Sky Blue to Teal gradient */
     color: white;
     border-radius: 10px;
     margin: 1.25rem auto;
@@ -152,17 +156,42 @@ ul {
     margin: 0.625rem 0;
     border-radius: 8px;
     box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15);
-    border-left: 6px solid rgb(233, 150, 122); /* Coral accent */
+    border-left: 6px solid rgb(233, 150, 122);
+    /* Coral accent */
     display: flex;
     justify-content: space-between;
     align-items: center;
     width: 100%;
 }
 
+.button-group {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.button-group button {
+    padding: 6px 12px;
+    font-size: 0.9rem;
+}
+
+/* Stack vertically on smaller screens */
 @media (max-width: 600px) {
     .opportunity-list li {
-        align-items: flex-start;
-        padding: 0.75rem;
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .button-group {
+        flex-direction: column;
+        align-items: stretch;
+        width: 100%;
+        margin-top: 0.5rem;
+    }
+
+    .button-group button {
+        width: 100%;
     }
 }
 
@@ -203,6 +232,23 @@ ul {
 }
 
 /* Modal Styling */
+@media (max-width: 480px) {
+    .modal-content {
+        padding: 16px;
+    }
+
+    .modal-content button {
+        width: 100%;
+        margin-bottom: 10px;
+    }
+}
+
+.modal-content input,
+.modal-content textarea,
+.modal-content button {
+    font-size: 16px; /* important for mobile tap targets */
+}
+
 .modal {
     position: fixed;
     top: 0;
@@ -214,17 +260,48 @@ ul {
     align-items: center;
     justify-content: center;
     z-index: 10;
-  }
-  .modal-content {
+    overflow: auto;
+}
+
+.modal-content {
+    font-family: sans-serif;
+    line-height: 1.4;
     background: white;
     padding: 1rem;
     border-radius: 0.5rem;
     width: 90%;
     max-width: 500px;
-  }
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+}
 
-  /* Notification styling */
-  .toast {
+.modal-content h2 {
+    margin-top: 0;
+    font-size: 1.4rem;
+}
+
+.modal-content input,
+.modal-content textarea {
+    display: block;
+    width: 100%;
+    margin-bottom: 12px;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+.modal-content button {
+    margin-right: 10px;
+}
+
+.required {
+    color: red;
+    margin-left: 4px;
+}
+
+/* Notification styling */
+.toast {
     position: fixed;
     bottom: 1rem;
     right: 1rem;
@@ -246,6 +323,7 @@ ul {
         opacity: 0;
         transform: translateY(20px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);

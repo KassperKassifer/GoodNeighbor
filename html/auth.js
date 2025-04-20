@@ -97,9 +97,9 @@ async function loginUser(event) {
         console.log("Data from loginUser:", data)
 
         if (response.ok) {
-            sessionStorage.setItem("authHeader", authHeader);
+            sessionStorage.setItem("authHeader", authHeader);   // Store authheader
             sessionStorage.setItem("username", data.username); // Store user's username
-            sessionStorage.setItem("userRole", data.role);
+            sessionStorage.setItem("userRole", data.role);  // Store user's role
             alert("Login successful!");
             window.location.href = "/index.html"; // Redirect to homepage
         } else {
@@ -107,16 +107,6 @@ async function loginUser(event) {
         }
     } catch (error) {
         console.error("Login error:", error);
-    }
-}
-
-// Check Authentication Status
-function checkAuthStatus() {
-    const authHeader = sessionStorage.getItem("authHeader");
-    const statusElement = document.getElementById("authStatus");
-
-    if (statusElement) {
-        statusElement.innerText = authHeader ? "Logged in" : "Not logged in";
     }
 }
 

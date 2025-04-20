@@ -33,16 +33,28 @@
         <div class="modal-content">
         <h2>Edit Opportunity</h2>
         <form id="editForm">
+            <p><span class="required">*</span> indicates required fields</p>
             <input type="hidden" id="editId">
+            <label for="editName">Name<span class="required">*</span></label>
             <input type="text" id="editName" placeholder="Name" required>
+            <label for="editLocation">Location<span class="required">*</span></label>
             <input type="text" id="editLocation" placeholder="Location" required>
+
+            <label for="editDescription">Description</label>
             <textarea id="editDescription" placeholder="Description"></textarea>
+            <label for="editEventDate">Event Date</label>
             <input type="date" id="editEventDate">
+            <label for="editStartTime">Start Time</label>
             <input type="time" id="editStartTime">
+            <label for="editEndTime">End Time</label>
             <input type="time" id="editEndTime">
+            <label for="editContactName">Contact Name</label>
             <input type="text" id="editContactName" placeholder="Contact Name">
+            <label for="editContactEmail">Contact Email</label>
             <input type="email" id="editContactEmail" placeholder="Contact Email">
+            <label for="editContactPhone">Contact Phone</label>
             <input type="tel" id="editContactPhone" placeholder="Contact Phone">
+            
             <button type="submit">Save</button>
             <button type="button" onclick="closeEditModal()">Cancel</button>
         </form>
