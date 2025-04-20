@@ -6,6 +6,25 @@ document.addEventListener("DOMContentLoaded", () => {
         refreshOpportunities();
     }
 
+    const container = document.querySelector(".container");
+    const userRole = sessionStorage.getItem("userRole");
+    const formSection = document.getElementById("opportunityFormSection");
+
+    if (formSection && userRole === "user") {
+        formSection.style.display = "none";
+    }
+
+    // Count visible direct children of container in order to dynamically change the grid layout
+    const visibleSections = Array.from(container.children).filter(
+        (el) => el.style.display !== "none"
+    );
+
+    // If only one section is visible, switch to one column and center it horizontally
+    if (visibleSections.length <= 1) {
+        container.style.gridTemplateColumns = "1fr";
+        container.style.justifyItems = "center";
+    }
+
     const form = document.getElementById("opportunityForm");
     if (form) {
         form.addEventListener("submit", addOpportunity);
