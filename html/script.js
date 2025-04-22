@@ -39,6 +39,11 @@ document.addEventListener("DOMContentLoaded", () => {
     if (editForm) {
         editForm.addEventListener("submit", editOpportunityFormHandler);
     }
+
+    const voiceBtn = document.getElementById("startVoiceSearch");
+    if (voiceBtn) {
+        voiceBtn.addEventListener("click", handleVoiceSearch);
+    }
 });
 
 // Refresh Volunteer Opportunities
@@ -46,20 +51,27 @@ const refreshOpportunities = async () => {
     console.log("Refreshing volunteer opportunities...");
 
     try {
-        // Fetch both events and user signups in parallel
-        const [eventRes, signupRes] = await Promise.all([
-            fetch('/api/events'),
-            fetch('/api/signups', { headers: getAuthHeaders() })
-        ]);
+        // Always fetch events
+        const eventRes = await fetch('/api/events');
+        if (!eventRes.ok) throw new Error("Failed to fetch events");
+        const opportunities = await eventRes.json();
 
-        if (!eventRes.ok || !signupRes.ok) {
-            throw new Error("Failed to fetch events or signups");
+        // Try fetching signups only if logged in
+        let signedUpEventIds = [];
+        const authHeader = getAuthHeaders();
+
+        if (authHeader?.Authorization) {
+            const signupRes = await fetch('/api/signups', { headers: authHeader });
+
+            if (signupRes.ok) {
+                const signups = await signupRes.json();
+                signedUpEventIds = signups.signups.map(s => s.opportunity_id);
+            } else {
+                console.warn("User not signed in or signups not available");
+            }
         }
 
-        const opportunities = await eventRes.json();
-        const signups = await signupRes.json();
-        const signedUpEventIds = signups.signups.map(s => s.opportunity_id);
-
+        // Render the events
         const list = document.getElementById("opportunityList");
         if (!list) return;
 
@@ -415,4 +427,99 @@ function showToast(msg) {
     setTimeout(() => {
         toast.remove();
     }, 5000);
+}
+
+// Record speech using the Web Speech API and then notify user of result (if given permission)
+// using the Notifications API
+function handleVoiceSearch() {
+    const spokenOutput = document.getElementById("spokenText");
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        alert("Speech Recognition API is not supported in this browser.");
+        return;
+    }
+
+    // Create and configure Speech Recognition 
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+
+    // Indicate that the mic is on and listening
+    recognition.onstart = () => {
+        if (spokenOutput) {
+            spokenOutput.textContent = "Listening...";
+        }
+    };
+
+    // Set up event handlers
+    recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        const confidence = event.results[0][0].confidence;
+        console.log(`Transcript: ${transcript} (Confidence: ${confidence})`);
+
+        if (spokenOutput) {
+            spokenOutput.textContent = `You said: "${transcript}"`;
+        }
+
+        showVolunteerNotification(transcript);
+    };
+
+    recognition.onerror = (event) => {
+        console.error("Speech recognition error:", event.error);
+        showToast("Error: " + event.error, "error");
+        if (spokenOutput) {
+            spokenOutput.textContent = "";
+        }
+    };
+
+    recognition.onend = () => {
+        console.log("Voice recognition ended.");
+        
+        // Only clear "Listening..." if no transcript came back
+        if (spokenOutput && spokenOutput.textContent === "Listening...") {
+            spokenOutput.textContent = "No speech detected.";
+        }
+    };
+
+    // Start recording
+    recognition.start();
+}
+
+// 
+function showVolunteerNotification(transcript) {
+    // Check if the browser supports notifications
+    if (!("Notification" in window)) {
+        alert("This browser does not support system notifications.");
+        return;
+    }
+
+    // Check if permission was already granted
+    if (Notification?.permission === "granted") {
+        const notification = new Notification("GoodNeighbor Match", {
+            body: `Found something for "${transcript}"!`,
+        });
+
+        // Optional: auto-close notification after 4 seconds
+        setTimeout(() => notification.close(), 4000);
+    }
+
+    // Otherwise, request permission
+    else if (Notification?.permission !== "denied") {
+        Notification.requestPermission().then(permission => {
+            if (permission === "granted") {
+                const notification = new Notification("GoodNeighbor Match", {
+                    body: `Found something for "${transcript}"!`,
+                });
+
+                setTimeout(() => notification.close(), 4000);
+            }
+        });
+    }
+
+    // Explicitly denied permission
+    else {
+        showToast(`Found something for "${transcript}"!`, "success");
+    }
 }
