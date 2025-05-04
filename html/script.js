@@ -10,7 +10,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const userRole = sessionStorage.getItem("userRole");
     const formSection = document.getElementById("opportunityFormSection");
 
-    if (formSection && userRole === "user") {
+    if (formSection && ( userRole === "user" || userRole === null)) {
         formSection.style.display = "none";
     }
 

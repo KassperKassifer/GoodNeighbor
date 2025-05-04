@@ -37,6 +37,7 @@ const verifyPassword = async (password, hash) => {
 
 // Authenticate user function
 const authenticate = async (auth = '') => {
+    console.log("Authenticating user..")
     if (!auth.startsWith('Basic ')) return { authenticated: false };
 
     const [username, password] = Buffer.from(auth.slice(6), 'base64').toString().split(':');

@@ -76,6 +76,7 @@ async function registerUser(event) {
 
 // Login User
 async function loginUser(event) {
+    console.log("In loginUser..")
     event.preventDefault();
     const username = document.getElementById("loginUsername").value;
     const password = document.getElementById("loginPassword").value;
