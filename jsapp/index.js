@@ -92,7 +92,7 @@ const handleRegister = async (req, res, adminRegistering = false) => {
             if (adminRegistering && ["admin", "organization"].includes(role)) {
                 assignedRole = role;
             }
-            
+
             // Insert new user into the database
             const result = await pool.query(
                 "INSERT INTO users (username, password, role) VALUES ($1, $2, $3) RETURNING id, username",
@@ -131,7 +131,7 @@ const handleRequest = async (req, res) => {
     }
 
     // Protect routes that require authentication
-    if (['POST', 'PUT', 'DELETE'].includes(req.method) && !auth.authenticated) {        
+    if (['POST', 'PUT', 'DELETE'].includes(req.method) && !auth.authenticated) {
         res.writeHead(401, { "WWW-Authenticate": "Basic realm='GoodNeighbor'" });
         return res.end('Unauthorized');
     }
@@ -144,7 +144,7 @@ const handleRequest = async (req, res) => {
             req.on("end", async () => {
                 try {
                     const { opportunity_id, hours } = JSON.parse(body);
-                    if (!opportunity_id|| !hours) {
+                    if (!opportunity_id || !hours) {
                         return sendJSON(res, { error: "Missing opportunity_id or hours" }, 400);
                     }
 
@@ -154,7 +154,7 @@ const handleRequest = async (req, res) => {
                     }
 
                     const userResult = await pool.query(
-                        "SELECT id FROM users WHERE LOWER(username) = LOWER($1)", 
+                        "SELECT id FROM users WHERE LOWER(username) = LOWER($1)",
                         [username]
                     );
 
@@ -177,18 +177,18 @@ const handleRequest = async (req, res) => {
                     return sendJSON(res, { error: "Database error", details: error.message }, 500);
                 }
             });
-        // Route handling for creating a new opportunity/event
+            // Route handling for creating a new opportunity/event
         } else {
             if (auth.role !== "admin" && auth.role !== "organization") {
                 return sendJSON(res, { error: "Only organizations can create opportunities" }, 403);
             }
-        
+
             let body = "";
             req.on("data", (data) => (body += data));
             req.on("end", async () => {
                 const opportunity = JSON.parse(body);
                 console.log("Parsed JSON successfully:", opportunity);
-                
+
                 try {
                     const {
                         name,
@@ -278,6 +278,20 @@ const handleRequest = async (req, res) => {
             role: auth.role
         });
     }
+    // Return users for admins only
+    else if (req.method === "GET" && req.url === "/api/users") {
+        if (!auth || auth.role !== "admin") {
+            return sendJSON(res, { error: "Forbidden" }, 403);
+        }
+
+        try {
+            const result = await pool.query("SELECT id, username, role FROM users ORDER BY id");
+            return sendJSON(res, result.rows);
+        } catch (err) {
+            console.error("Error fetching users:", err);
+            return sendJSON(res, { error: "Server error" }, 500);
+        }
+    }
     // Return opportunity details
     else if (req.method === "GET") {
         if (auth.role !== "admin" && auth.role !== "organization") {
@@ -286,24 +300,24 @@ const handleRequest = async (req, res) => {
         const id = path.split("/")[2];
         try {
             const result = await pool.query("SELECT * FROM opportunities WHERE id = $1", [id]);
-    
+
             if (result.rows.length === 0) {
                 return sendJSON(res, { error: "Opportunity not found" }, 404);
             }
-    
+
             sendJSON(res, result.rows[0]);
         } catch (error) {
             console.error("Error fetching opportunity by ID:", error.message);
             sendJSON(res, { error: "Database error" }, 500);
         }
-    } 
+    }
     // Route handling for updating an opportunity
     else if (req.method === "PUT") {
         console.log("In PUT route..")
         if (auth.role !== "admin" && auth.role !== "organization") {
             return sendJSON(res, { error: "Only organizations or admins can update opportunities" }, 403);
         }
-    
+
         const id = path.split("/")[2];
         let body = "";
         req.on("data", (data) => (body += data));
@@ -333,7 +347,7 @@ const handleRequest = async (req, res) => {
                     contact_email,
                     contact_phone
                 });
-    
+
                 const result = await pool.query(
                     `UPDATE opportunities SET
                         name = $1,
@@ -362,17 +376,40 @@ const handleRequest = async (req, res) => {
                         auth.username
                     ]
                 );
-    
+
                 if (result.rows.length === 0) {
                     return sendJSON(res, { error: "Opportunity not found" }, 404);
                 }
-    
+
                 console.log("Updated opportunity:", result.rows[0]);
                 notifyAll(`Opportunity Updated: ${name}`);
                 sendJSON(res, result.rows[0], 200);
             } catch (error) {
                 console.error("Error updating opportunity:", error.message);
                 sendJSON(res, { error: "Update failed", details: error.message }, 500);
+            }
+        });
+    }
+    else if (req.method === "PATCH" && req.url.startsWith("/api/users/") && req.url.endsWith("/role")) {
+        if (!auth || auth.role !== "admin") {
+            return sendJSON(res, { error: "Forbidden" }, 403);
+        }
+
+        const id = req.url.split("/")[3];
+        let body = "";
+        req.on("data", chunk => body += chunk);
+        req.on("end", async () => {
+            try {
+                const { role } = JSON.parse(body);
+                if (!["user", "organization", "admin"].includes(role)) {
+                    return sendJSON(res, { error: "Invalid role" }, 400);
+                }
+
+                await pool.query("UPDATE users SET role = $1 WHERE id = $2", [role, id]);
+                return sendJSON(res, { success: true });
+            } catch (err) {
+                console.error("Error updating role:", err);
+                return sendJSON(res, { error: "Server error" }, 500);
             }
         });
     }
@@ -384,16 +421,16 @@ const handleRequest = async (req, res) => {
         try {
             const userResult = await pool.query("SELECT id FROM users WHERE username = $1", [auth.username]);
             const userId = userResult.rows[0]?.id;
-    
+
             if (!userId) {
                 return sendJSON(res, { error: "User not found" }, 404);
             }
-    
+
             await pool.query(
                 "DELETE FROM event_signups WHERE user_id = $1 AND opportunity_id = $2",
                 [userId, opportunityId]
             );
-    
+
             return sendJSON(res, { message: "Signup cancelled" }, 200);
         } catch (error) {
             console.error("Error cancelling signup:", error);
