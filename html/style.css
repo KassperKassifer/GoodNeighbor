@@ -436,3 +436,65 @@ ul {
         color: #555;
     }
 }
+
+/* Org dashboard styles */
+.dashboard-container {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    max-width: 900px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+}
+
+/* Dashboard header */
+.dashboard-container h2 {
+    font-size: 2rem;
+    text-align: center;
+    margin-bottom: 0;
+}
+
+/* Stats section */
+#statsSummary {
+    display: flex;
+    justify-content: space-around;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.stat-card {
+    background: #ffffff;
+    padding: 1.5rem;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    min-width: 200px;
+    text-align: center;
+    font-weight: bold;
+    font-size: 1.2rem;
+}
+
+/* Event breakdown lists */
+#eventBreakdown section {
+    margin-top: 1rem;
+}
+
+#eventBreakdown h3 {
+    font-size: 1.4rem;
+    margin-bottom: 0.5rem;
+}
+
+.event-list {
+    list-style: none;
+    padding: 0;
+    display: grid;
+    gap: 0.75rem;
+}
+
+.event-list li {
+    background: #f9f9f9;
+    padding: 1rem;
+    border-left: 6px solid rgb(233, 150, 122);
+    /* accent color */
+    border-radius: 6px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.06);
+}

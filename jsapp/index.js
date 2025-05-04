@@ -211,12 +211,12 @@ const handleRequest = async (req, res) => {
                     const result = await pool.query(`
                         INSERT INTO opportunities (
                             name, location, description, event_date, start_time, end_time, 
-                            contact_name, contact_email, contact_phone, modified_by
-                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) 
+                            contact_name, contact_email, contact_phone, modified_by, created_by
+                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) 
                         RETURNING *`,
-                        [name, location, description, event_date, start_time, end_time, contact_name, contact_email, contact_phone, auth.username]
+                        [name, location, description, event_date, start_time, end_time, contact_name, contact_email, contact_phone, auth.username, auth.id]
                     );
-                    notifyAll(`New Opportunity: ${name} at ${location}`);
+                    notifyAll(`New Opportunity: ${name} at ${location}\n event_date, start_time`);
                     sendJSON(res, result.rows[0], 201);
                 } catch (error) {
                     console.error("Error adding opportunity:", error.message);
@@ -279,7 +279,7 @@ const handleRequest = async (req, res) => {
         });
     }
     // Return users for admins only
-    else if (req.method === "GET" && req.url === "/api/users") {
+    else if (req.method === "GET" && path === "/api/users") {
         if (!auth || auth.role !== "admin") {
             return sendJSON(res, { error: "Forbidden" }, 403);
         }
@@ -289,6 +289,59 @@ const handleRequest = async (req, res) => {
             return sendJSON(res, result.rows);
         } catch (err) {
             console.error("Error fetching users:", err);
+            return sendJSON(res, { error: "Server error" }, 500);
+        }
+    }
+    else if (req.method === "GET" && path === "/api/org/dashboard"){
+        // Get activity summary for an organization
+        if (!auth || auth.role !== "organization") {
+            return sendJSON(res, { error: "Forbidden" }, 403);
+        }
+
+        try {
+            console.log("Org dashboard route hit by:", auth.username);
+            const today = new Date().toISOString().split("T")[0]; // "YYYY-MM-DD"
+
+            const orgResult = await pool.query("SELECT id FROM users WHERE username = $1", [auth.username]);
+            const org_id = orgResult.rows[0]?.id;
+
+            if (!org_id) {
+                return sendJSON(res, { error: "User not found" }, 404);
+            }
+
+            const eventsResult = await pool.query(
+                `SELECT id, name, location, event_date
+                 FROM opportunities
+                 WHERE created_by = $1
+                 ORDER BY event_date DESC`,
+                [org_id]
+            );
+            console.log("Fetched events:", eventsResult.rows);
+            const formatAsDateOnly = (date) => new Date(date).toISOString().split("T")[0];
+
+            const statsResult = await pool.query(
+                `SELECT
+                    COUNT(DISTINCT o.id) AS event_count,
+                    COUNT(e.id) AS total_signups,
+                    COALESCE(SUM(e.hours), 0) AS total_hours
+                 FROM opportunities o
+                 LEFT JOIN event_signups e ON o.id = e.opportunity_id
+                 WHERE o.created_by = $1`,
+                [org_id]
+            );
+            console.log("Fetched stats:", statsResult.rows[0]);
+            
+            const upcoming = eventsResult.rows.filter(e => formatAsDateOnly(e.event_date) > today);
+            const past = eventsResult.rows.filter(e => formatAsDateOnly(e.event_date) <= today);
+
+            return sendJSON(res, {
+                stats: statsResult.rows[0],
+                upcoming,
+                past
+            });
+
+        } catch (err) {
+            console.error("Error fetching organization summary:", err);
             return sendJSON(res, { error: "Server error" }, 500);
         }
     }
@@ -359,8 +412,8 @@ const handleRequest = async (req, res) => {
                         contact_name = $7,
                         contact_email = $8,
                         contact_phone = $9,
-                        modified_by = $11
-                     WHERE id = $10
+                        modified_by = $10
+                     WHERE id = $11
                      RETURNING *`,
                     [
                         name,
@@ -372,8 +425,8 @@ const handleRequest = async (req, res) => {
                         contact_name,
                         contact_email,
                         contact_phone,
-                        id,
-                        auth.username
+                        auth.username,
+                        id
                     ]
                 );
 
@@ -390,6 +443,7 @@ const handleRequest = async (req, res) => {
             }
         });
     }
+    // Allow admins to change user roles
     else if (req.method === "PATCH" && req.url.startsWith("/api/users/") && req.url.endsWith("/role")) {
         if (!auth || auth.role !== "admin") {
             return sendJSON(res, { error: "Forbidden" }, 403);

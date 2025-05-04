@@ -15,14 +15,16 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // Count visible direct children of container in order to dynamically change the grid layout
-    const visibleSections = Array.from(container.children).filter(
-        (el) => el.style.display !== "none"
-    );
+    if(container){
+        const visibleSections = Array.from(container.children).filter(
+            (el) => el.style.display !== "none"
+        );
 
-    // If only one section is visible, switch to one column and center it horizontally
-    if (visibleSections.length <= 1) {
-        container.style.gridTemplateColumns = "1fr";
-        container.style.justifyItems = "center";
+        // If only one section is visible, switch to one column and center it horizontally
+        if (visibleSections.length <= 1) {
+            container.style.gridTemplateColumns = "1fr";
+            container.style.justifyItems = "center";
+        }
     }
 
     const form = document.getElementById("opportunityForm");
@@ -269,49 +271,6 @@ async function signUpForEvent(selected_opportunity_id) {
 }
 
 // PUT: Edit an existing opportunity
-async function editOpportunity(id) {
-    console.log("In editOpportunity()...")
-    // Show a modal or form to collect updated info
-    const name = document.getElementById("editName")?.value || "";
-    const location = document.getElementById("editLocation")?.value || "";
-    const description = document.getElementById("editDescription")?.value || "";
-    const event_date = document.getElementById("editDate")?.value || "";
-    const start_time = document.getElementById("editStartTime")?.value || "";
-    const end_time = document.getElementById("editEndTime")?.value || "";
-    const contact_name = document.getElementById("editContactName")?.value || "";
-    const contact_email = document.getElementById("editContactEmail")?.value || "";
-    const contact_phone = document.getElementById("editContactPhone")?.value || "";
-
-    try {
-        const response = await fetch(`/api/${id}`, {
-            method: "PUT",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": sessionStorage.getItem("authHeader")
-            },
-            body: JSON.stringify({
-                name,
-                location,
-                description,
-                event_date,
-                start_time,
-                end_time,
-                contact_name,
-                contact_email,
-                contact_phone
-            })
-        });
-
-        if (!response.ok) throw new Error("Failed to edit opportunity");
-
-        refreshOpportunities(); // Refresh the event list
-        showToast("Opportunity updated!", "success");
-    } catch (error) {
-        console.error("Error editing opportunity:", error);
-        showToast("An error occurred while updating the opportunity.", "error");
-    }
-}
-
 async function editOpportunityFormHandler(e) {
     e.preventDefault();
     const id = document.getElementById("editId")?.value;

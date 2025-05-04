@@ -30,6 +30,7 @@ function updateNav() {
             <a href="/events.html">Events</a>
             <a href="/profile.html">Profile</a>
             ${userRole === "admin" ? `<a href="/manage_users.html">Manage Users</a>` : ""}
+            ${userRole === "organization" ? `<a href="/org_dashboard.html">Org Dashboard</a>` : ""}
             <a href="#" id="logoutLink">Logout</a>
         `;
 
