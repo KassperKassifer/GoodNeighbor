@@ -10,12 +10,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const userRole = sessionStorage.getItem("userRole");
     const formSection = document.getElementById("opportunityFormSection");
 
-    if (formSection && ( userRole === "user" || userRole === null)) {
+    if (formSection && (userRole === "user" || userRole === null)) {
         formSection.style.display = "none";
     }
 
     // Count visible direct children of container in order to dynamically change the grid layout
-    if(container){
+    if (container) {
         const visibleSections = Array.from(container.children).filter(
             (el) => el.style.display !== "none"
         );
@@ -42,11 +42,38 @@ document.addEventListener("DOMContentLoaded", () => {
         editForm.addEventListener("submit", editOpportunityFormHandler);
     }
 
+    const textSearchInput = document.getElementById("textSearch");
+    if (textSearchInput) {
+        textSearchInput.addEventListener("input", (e) => {
+            filterOpportunitiesByQuery(e.target.value);
+        });
+    }
+
     const voiceBtn = document.getElementById("startVoiceSearch");
     if (voiceBtn) {
         voiceBtn.addEventListener("click", handleVoiceSearch);
     }
 });
+
+let allOpportunities = [];
+let signedUpEventIds = [];
+
+// Filter based on text or speech searches
+function filterOpportunitiesByQuery(query) {
+    const lowerQuery = query.toLowerCase().trim();
+
+    const filtered = allOpportunities.filter(opp =>
+        opp.name.toLowerCase().includes(lowerQuery) ||
+        opp.location.toLowerCase().includes(lowerQuery) ||
+        (opp.description && opp.description.toLowerCase().includes(lowerQuery))
+    );
+
+    renderOpportunities(filtered, signedUpEventIds);
+
+    if (filtered.length === 0) {
+        showToast(`No results found for "${query}".`, "info");
+    }
+}
 
 // Refresh Volunteer Opportunities
 const refreshOpportunities = async () => {
@@ -57,9 +84,10 @@ const refreshOpportunities = async () => {
         const eventRes = await fetch('/api/events');
         if (!eventRes.ok) throw new Error("Failed to fetch events");
         const opportunities = await eventRes.json();
+        allOpportunities = opportunities; // save globally so we can filter without refetching
 
         // Try fetching signups only if logged in
-        let signedUpEventIds = [];
+        signedUpEventIds = [];
         const authHeader = getAuthHeaders();
 
         if (authHeader?.Authorization) {
@@ -73,49 +101,51 @@ const refreshOpportunities = async () => {
             }
         }
 
-        // Render the events
-        const list = document.getElementById("opportunityList");
-        if (!list) return;
+        // Render using reusable function
+        renderOpportunities(allOpportunities, signedUpEventIds);
 
-        list.innerHTML = "";
-
-        opportunities.forEach((opportunity) => {
-            const listItem = document.createElement('li');
-
-            const userRole = sessionStorage.getItem("userRole");
-            const userHasSignedUp = signedUpEventIds.includes(opportunity.id);
-
-            listItem.innerHTML = `
-                <div class="opportunity-content">
-                    <strong>${opportunity.name}</strong> ${opportunity.location}
-                    <br><em>Last modified by: ${opportunity.modified_by || "Unknown"}</em>
-                </div>
-
-                <div class="button-group">
-                    ${
-                        userRole === "user" 
-                            ? (!userHasSignedUp
-                                ? `<button onclick="signUpForEvent(${opportunity.id})">Sign Up</button>`
-                                : `<span class="badge success">Signed Up</span>`)
-                            : ""
-                    }
-                    ${
-                        (userRole === "admin" || userRole === "organization")
-                            ? `<button onclick='openEditModal(${JSON.stringify(opportunity)})'>Edit</button>
-                               <button onclick="deleteOpportunity(${opportunity.id})">Delete</button>`
-                            : ""
-                    }
-                </div>
-            `;
-
-            list.appendChild(listItem);
-        });
-
-        console.log("Fetched Volunteer Opportunities:", opportunities);
+        console.log("Fetched Volunteer Opportunities:", allOpportunities);
     } catch (error) {
         console.error("Error refreshing volunteer opportunities:", error);
     }
 };
+
+
+function renderOpportunities(opportunities, signedUpIds) {
+    const list = document.getElementById("opportunityList");
+    if (!list) return;
+
+    list.innerHTML = "";
+    const userRole = sessionStorage.getItem("userRole");
+
+    opportunities.forEach((opportunity) => {
+        const listItem = document.createElement('li');
+        const userHasSignedUp = signedUpIds.includes(opportunity.id);
+
+        listItem.innerHTML = `
+            <div class="opportunity-content">
+                <strong>${opportunity.name}</strong> ${opportunity.location}
+                <br><em>Last modified by: ${opportunity.modified_by || "Unknown"}</em>
+            </div>
+            <div class="button-group">
+                ${userRole === "user"
+                ? (!userHasSignedUp
+                    ? `<button onclick="signUpForEvent(${opportunity.id})">Sign Up</button>`
+                    : `<span class="badge success">Signed Up</span>`)
+                : ""
+            }
+                ${(userRole === "admin" || userRole === "organization")
+                ? `<button onclick='openEditModal(${JSON.stringify(opportunity)})'>Edit</button>
+                       <button onclick="deleteOpportunity(${opportunity.id})">Delete</button>`
+                : ""
+            }
+            </div>
+        `;
+
+        list.appendChild(listItem);
+    });
+}
+
 
 function showToast(msg, type = "info") {
     const toast = document.createElement("div");
@@ -153,7 +183,7 @@ async function addOpportunity(event) {
     try {
         let response = await fetch('/api', {
             method: "POST",
-            headers: { 
+            headers: {
                 "Content-Type": "application/json",
                 "Authorization": sessionStorage.getItem("authHeader")
             },
@@ -185,34 +215,6 @@ async function fetchAllOpportunities() {
     } catch (error) {
         console.error("Error fetching all volunteers:", error);
         showToast("Error fetching volunteers. Check console for details.", "error");
-    }
-}
-
-// GET an opportunity by name
-async function fetchOppByName() {
-    const searchField = document.getElementById("oppNameSearch");
-    if (!searchField) {
-        console.error("Search field not found.");
-        return;
-    }
-
-    let name = searchField.value;
-    if (!name) {
-        showToast("Please enter a name to search.", "error");
-        return;
-    }
-
-    try {
-        let response = await fetch(`/api?name=${encodeURIComponent(name)}`);
-
-        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-
-        let data = await response.json();
-        console.log(`Opportunity (${name}):`, data);
-        alert(JSON.stringify(data, null, 2));
-    } catch (error) {
-        console.error("Error fetching opportunity by name:", error);
-        showToast("Error fetching opportunity. Check console for details.", "error");
     }
 }
 
@@ -257,7 +259,7 @@ async function signUpForEvent(selected_opportunity_id) {
             },
             body: JSON.stringify({ opportunity_id: selected_opportunity_id, hours: Number(inputHours) })
         });
-        
+
         if (response.ok) {
             showToast("Successfully signed up for event!", "success");
         } else {
@@ -339,14 +341,14 @@ function openEditModal(opportunity) {
     document.getElementById("editContactPhone").value = opportunity.contact_phone || "";
     document.getElementById("editModal").style.display = "flex";
 }
-  
+
 function closeEditModal() {
     document.getElementById("editModal").style.display = "none";
 }
 
 // WebSocket setup from class
 let wsurl
-if(window.location.protocol == 'http:') {
+if (window.location.protocol == 'http:') {
     // assume dev environment. Very sad, http-server doesn't proxy ws :(
     wsurl = 'ws://localhost:3000/ws'
 } else {
@@ -371,22 +373,6 @@ sock.addEventListener('message', ({ data }) => {
         console.error("WebSocket JSON parse error:", e);
     }
 });
-
-// Diplay WebSocket notifications 
-function showToast(msg) {
-    const toast = document.createElement("div");
-    toast.className = "toast";
-    toast.textContent = msg;
-    document.body.appendChild(toast);
-
-    setTimeout(() => {
-        toast.classList.add("fade-out");
-    }, 4000);
-
-    setTimeout(() => {
-        toast.remove();
-    }, 5000);
-}
 
 // Record speech using the Web Speech API and then notify user of result (if given permission)
 // using the Notifications API
@@ -419,9 +405,19 @@ function handleVoiceSearch() {
         console.log(`Transcript: ${transcript} (Confidence: ${confidence})`);
 
         if (spokenOutput) {
-            spokenOutput.textContent = `You said: "${transcript}"`;
+            spokenOutput.textContent = `You said: "${transcript}" (Confidence: ${confidence})`;
         }
 
+        // Update the text input for consistency with text search
+        const textSearchInput = document.getElementById("textSearch");
+        if (textSearchInput) {
+            textSearchInput.value = transcript;
+        }
+
+        // Trigger filtering
+        filterOpportunitiesByQuery(transcript);
+
+        // Trigger system notification if permissions granted
         showVolunteerNotification(transcript);
     };
 
@@ -435,7 +431,7 @@ function handleVoiceSearch() {
 
     recognition.onend = () => {
         console.log("Voice recognition ended.");
-        
+
         // Only clear "Listening..." if no transcript came back
         if (spokenOutput && spokenOutput.textContent === "Listening...") {
             spokenOutput.textContent = "No speech detected.";
@@ -446,7 +442,7 @@ function handleVoiceSearch() {
     recognition.start();
 }
 
-// 
+
 function showVolunteerNotification(transcript) {
     // Check if the browser supports notifications
     if (!("Notification" in window)) {
